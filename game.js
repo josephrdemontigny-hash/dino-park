@@ -1,7 +1,7 @@
 /* Primeval Park v1 - a dinosaur park tycoon. Three.js r160 (vendored), no build step. */
 import * as THREE from './vendor/three.module.min.js';
 import { mergeGeometries } from './vendor/BufferGeometryUtils.js';
-import { Dino, SPECIES_DATA, prewarm } from './dino.js';
+import { Dino, SPECIES_DATA, prewarm, setDinoCamera, setDinoQuality } from './dino.js';
 import * as M from './models.js';
 import * as SFX from './audio.js';
 
@@ -68,7 +68,7 @@ const QUALITY = { level: 2, forced: false, pr: [1, 1.5, 2], shadow: [1024, 1536,
 if (QS.has('q')){ QUALITY.level = clamp(parseInt(QS.get('q')) || 0, 0, 2); QUALITY.forced = true; }
 const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 2400);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 2400); setDinoCamera(camera);
 const FOG_COL = new THREE.Color(0xbfd0c8);
 scene.fog = new THREE.FogExp2(FOG_COL.clone(), 0.0016);
 const hemi = new THREE.HemisphereLight(0xd4e4ff, 0x4d4630, 0.95); scene.add(hemi);
@@ -434,6 +434,7 @@ function nearestGuest(x, z, maxD, filter){ let best = null, bd = maxD; for (cons
 function updateDino(d, dt){
   const S = SPECIES[d.sp], SD = SPECIES_DATA[d.sp], pen = pens.get(d.pen); let speedMax = S.walk; const turnRate = 2.4 / Math.sqrt(SD.size / 3);
   d.roarCD -= dt; d.killCD -= dt; d.turn = 0;
+  if (d.prey && !d.prey.gone){ d.lookV = d.lookV || new THREE.Vector3(); d.model.setLook(d.lookV.set(d.prey.x, H(d.prey.x, d.prey.z) + 1.6, d.prey.z)); } else d.model.setLook(null);
   if (d.state === 'holding'){ return; }
   if (d.state === 'sedated' || d.state === 'airlift'){
     d.sleep = damp(d.sleep, 1, 2, dt); d.v = damp(d.v, 0, 4, dt); d.sedT += dt;
@@ -1198,7 +1199,7 @@ function makeThumbs(){
   const fl = new THREE.Mesh(new THREE.CircleGeometry(30, 32).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x5a6a3a, roughness: 1 })); s.add(fl);
   const c = new THREE.PerspectiveCamera(30, W / Hh, 0.1, 200); const buf = new Uint8Array(W * Hh * 4); const cv = M.mk(W, Hh), g = cv.getContext('2d'); const img = g.createImageData(W, Hh);
   const prevTM = renderer.toneMapping;
-  for (const sp of SP_KEYS){ const d = new Dino(sp); d.root.rotation.y = -1.0; s.add(d.root); d.animate(0.01, 0, 0); const SD = SPECIES_DATA[sp]; const L = SD.size, Hgt = sp === 'brachio' ? 12 : SD.legs[0].at[1] * 1.6;
+  for (const sp of SP_KEYS){ const d = new Dino(sp, { lod: 'hi' }); d.root.rotation.y = -1.0; s.add(d.root); d.animate(0.01, 0, 0); const SD = SPECIES_DATA[sp]; const L = SD.size, Hgt = sp === 'brachio' ? 12 : SD.legs[0].at[1] * 1.6;
     const dist = Math.max(L * 1.15, Hgt * 2.2); c.position.set(dist * 0.15, Hgt * 0.65 + dist * 0.12, dist); c.lookAt(0, Hgt * 0.5, 0);
     renderer.setRenderTarget(rt); renderer.render(s, c); renderer.readRenderTargetPixels(rt, 0, 0, W, Hh, buf); renderer.setRenderTarget(null);
     for (let y = 0; y < Hh; y++) img.data.set(buf.subarray((Hh - 1 - y) * W * 4, (Hh - y) * W * 4), y * W * 4); g.putImageData(img, 0, 0); THUMBS[sp] = cv.toDataURL('image/jpeg', 0.82); s.remove(d.root); }
@@ -1207,7 +1208,7 @@ function makeThumbs(){
 
 /* ================= quality ================= */
 function resize(){ const w = innerWidth, h = innerHeight; renderer.setPixelRatio(Math.min(DPR, QUALITY.pr[QUALITY.level])); renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w < h ? 55 : 45; camera.updateProjectionMatrix(); }
-function setQuality(l, manual){ QUALITY.level = l; if (manual) QUALITY.forced = true; const ms = QUALITY.shadow[l]; sun.shadow.mapSize.set(ms, ms); if (sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map = null; } shadowR = 0; resize(); refreshVegetation(); }
+function setQuality(l, manual){ QUALITY.level = l; setDinoQuality(l); if (manual) QUALITY.forced = true; const ms = QUALITY.shadow[l]; sun.shadow.mapSize.set(ms, ms); if (sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map = null; } shadowR = 0; resize(); refreshVegetation(); }
 window.addEventListener('resize', resize);
 const PERF = { frames: 0, t0: 0, fps: 0, hist: [], lastStep: 0, ms: 0 };
 function perfTick(now, frameMs){ PERF.frames++; PERF.ms += frameMs; if (now - PERF.t0 >= 1000){ PERF.fps = PERF.frames * 1000 / (now - PERF.t0); PERF.cpu = PERF.ms / PERF.frames; PERF.frames = 0; PERF.ms = 0; PERF.t0 = now; PERF.hist.push(PERF.fps); if (PERF.hist.length > 4) PERF.hist.shift();

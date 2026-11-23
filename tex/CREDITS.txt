@@ -4,4 +4,6 @@ dirt_*    <- brown_mud_leaves_01
 gravel_*  <- gravel_floor_02
 sand_*    <- aerial_beach_01
 rock_col  <- rock_face
-Dinosaurs, trees, leaves, palm fronds, buildings, fences, water and sky are generated procedurally in code.
+Dinosaur skin (v2): scale/pebble height, cavity and pattern maps are generated at runtime on a canvas (Worley/cellular noise + value-noise fbm) in dino.js; no external texture files, no third-party assets.
+Dinosaur meshes (v2): built procedurally at load time from signed-distance anatomy (surface-nets meshing) with a skeletal rig.
+Trees, leaves, palm fronds, buildings, fences, water and sky are generated procedurally in code.
