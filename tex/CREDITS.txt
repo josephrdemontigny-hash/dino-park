@@ -1,0 +1,7 @@
+Textures from Poly Haven (https://polyhaven.com), licensed CC0 1.0 (public domain). Resized to 512 px and recompressed.
+grass_*   <- aerial_grass_rock
+dirt_*    <- brown_mud_leaves_01
+gravel_*  <- gravel_floor_02
+sand_*    <- aerial_beach_01
+rock_col  <- rock_face
+Dinosaurs, trees, leaves, palm fronds, buildings, fences, water and sky are generated procedurally in code.
