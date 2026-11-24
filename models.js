@@ -8,7 +8,7 @@ export const lerp = (a, b, t) => a + (b - a) * t;
 export function mulberry(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 export function mk(w, h){ const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 export const M = (x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz));
-const _c = new THREE.Color(), _v = new THREE.Vector3();
+const _c = new THREE.Color(), _c2 = new THREE.Color(), _v = new THREE.Vector3();
 /* parts: [geometry, color(hex|fn), Matrix4?] -> one non-indexed vertex-coloured geometry */
 export function mergeColored(parts, keepUv = false){
   const geos = [];
@@ -281,13 +281,120 @@ function buildingDetail(type, add){
     case 'plant': { for (let i = 0; i < 6; i++) add(new THREE.ConeGeometry(0.12, 0.5, 5), 0x6a9a3a, M(-1.2 + i * 0.48, 1.45, 0.35 - (i % 2) * 0.6, 0.2, 0, 0.1)); break; }
   }
 }
+
+/* ---------- v9 building detail: entrances, awnings, lamps, signage and props on top of the v7 detail (hi only, merged into the same mesh) ---------- */
+function lamp(add, x, z, h = 3.2, ry = 0){ add(cyl(0.06, 0.08, h, 6), 0x2a2a26, M(x, h / 2, z)); add(box(0.5, 0.05, 0.05), 0x2a2a26, M(x + Math.sin(ry) * 0.2, h - 0.05, z + Math.cos(ry) * 0.2, 0, ry + Math.PI / 2, 0));
+  add(cyl(0.13, 0.09, 0.3, 6), 0xf2c060, M(x + Math.sin(ry) * 0.42, h - 0.25, z + Math.cos(ry) * 0.42)); add(new THREE.ConeGeometry(0.2, 0.16, 6), 0x2a2a26, M(x + Math.sin(ry) * 0.42, h - 0.04, z + Math.cos(ry) * 0.42)); }
+function awning(add, w, x, y, z, ry = 0, c1 = COL.red, c2 = COL.cream, d = 1.1){ const g = box(w, 0.06, d); add(g, (v, c) => c.setHex(Math.floor((v.x + w) * 2.2) % 2 ? c1 : c2), M(x + Math.sin(ry) * d * 0.45, y, z + Math.cos(ry) * d * 0.45, 0.32, ry, 0));
+  for (let k = 0; k < Math.round(w * 2.2); k++){ const xx = -w / 2 + (k + 0.5) / (w * 2.2) * w; add(new THREE.ConeGeometry(0.16, 0.22, 3), k % 2 ? c1 : c2, M(x + Math.cos(ry) * xx + Math.sin(ry) * d * 0.92, y - 0.28, z - Math.sin(ry) * xx + Math.cos(ry) * d * 0.92, Math.PI, ry, 0)); } }
+function table(add, x, z, umb = 0xd8321f){ add(cyl(0.45, 0.45, 0.06, 10), 0xe8e0cc, M(x, 0.78, z)); add(cyl(0.05, 0.05, 0.78, 6), 0x3a3a36, M(x, 0.39, z));
+  for (let k = 0; k < 3; k++){ const a = k * TAU / 3; add(box(0.32, 0.05, 0.32), 0x6a4a2e, M(x + Math.cos(a) * 0.7, 0.45, z + Math.sin(a) * 0.7)); add(cyl(0.03, 0.03, 0.45, 4), 0x3a3a36, M(x + Math.cos(a) * 0.7, 0.22, z + Math.sin(a) * 0.7)); }
+  if (umb){ add(cyl(0.025, 0.025, 1.6, 4), 0xd8d8d0, M(x, 1.6, z)); add(new THREE.ConeGeometry(1.0, 0.45, 8, 1, true), (v, c) => c.setHex(Math.floor((Math.atan2(v.z, v.x) + 4) * 1.27) % 2 ? umb : 0xf0ece0), M(x, 2.45, z)); } }
+function bench(add, x, z, ry = 0){ add(box(1.6, 0.06, 0.42), COL.wood, M(x, 0.46, z, 0, ry, 0)); add(box(1.6, 0.4, 0.05), COL.wood, M(x - Math.sin(ry) * 0.2, 0.7, z - Math.cos(ry) * 0.2, -0.15, ry, 0)); for (const e of [-0.65, 0.65]) add(box(0.06, 0.46, 0.42), 0x2a2a26, M(x + Math.cos(ry) * e, 0.23, z - Math.sin(ry) * e, 0, ry, 0)); }
+function planter(add, x, z, seed){ add(box(0.8, 0.5, 0.8), COL.stoneD, M(x, 0.25, z)); shrubs(add, x, 0.4, z, 3, seed); }
+function flag(add, x, z, h, col){ add(cyl(0.05, 0.06, h, 6), 0xd8d8d0, M(x, h / 2, z)); add(box(0.04, 0.7, 1.1), col, M(x, h - 0.45, z + 0.58)); add(new THREE.SphereGeometry(0.08, 6, 4), COL.amber, M(x, h + 0.05, z)); }
+function dinoSkull(add, x, y, z, s = 1){ const c = 0xe6dcc0; add(new THREE.SphereGeometry(0.6 * s, 10, 8), c, M(x, y, z, 0, 0, 0, 1, 0.85, 1.2)); add(box(0.7 * s, 0.5 * s, 1.1 * s), c, M(x, y - 0.12 * s, z + 0.85 * s, 0.12, 0, 0));
+  for (const sd of [-1, 1]){ add(new THREE.SphereGeometry(0.14 * s, 6, 4), 0x2a2018, M(x + sd * 0.38 * s, y + 0.12 * s, z + 0.3 * s)); add(new THREE.ConeGeometry(0.05 * s, 0.22 * s, 4), 0xf4ecd8, M(x + sd * 0.25 * s, y - 0.45 * s, z + 1.1 * s, Math.PI, 0, 0)); add(new THREE.ConeGeometry(0.05 * s, 0.22 * s, 4), 0xf4ecd8, M(x + sd * 0.3 * s, y - 0.45 * s, z + 0.75 * s, Math.PI, 0, 0)); }
+  add(box(0.7 * s, 0.14 * s, 1.0 * s), c, M(x, y - 0.55 * s, z + 0.75 * s, -0.08, 0, 0)); }
+function buildingDetail9(type, add){
+  switch (type){
+    case 'gate': for (const sd of [-1, 1]){ add(box(2.2, 2.6, 2.0), COL.wood, M(sd * 9.0, 1.3, 1.0)); add(hip(2.8, 2.6, 1.0), COL.thatch, M(sd * 9.0, 2.6, 1.0)); add(box(1.2, 0.8, 0.08), COL.glass, M(sd * 9.0, 1.6, 2.04)); add(box(1.6, 0.1, 0.4), COL.woodD, M(sd * 9.0, 1.05, 2.2));
+      lamp(add, sd * 7.0, 3.2, 3.6, 0); add(box(0.9, 3.6, 0.06), sd > 0 ? 0x2a5a3a : COL.red, M(sd * 5.2, 5.0, -0.85)); for (let k = 0; k < 3; k++) add(box(0.6, 0.6, 0.6), COL.stoneD, M(sd * (6.6 + k * 0.7), 0.3, -1.2)); } break;
+    case 'visitor': { awning(add, 6.2, 0, 4.1, 6.9, 0, COL.green, COL.cream, 1.5); for (const sd of [-1, 1]){ flag(add, sd * 6.5, 7.6, 7.5, sd > 0 ? COL.red : COL.amber); lamp(add, sd * 3.2, 8.3, 3.4, Math.PI); planter(add, sd * 7.2, 5.0, 90 + sd); bench(add, sd * 7.3, 2.0, sd * Math.PI / 2); }
+      add(box(1.4, 1.8, 0.12), 0x2e3a30, M(-2.4, 1.3, 8.4)); add(box(1.2, 1.5, 0.05), 0xe8dcc0, M(-2.4, 1.35, 8.48)); for (const sd of [-1, 1]) add(cyl(0.05, 0.05, 1.4, 5), 0x2e3a30, M(-2.4 + sd * 0.65, 0.7, 8.4));
+      dinoSkull(add, 0, 9.4, 4.2, 1.1); break; }
+    case 'hatchery': { for (let k = 0; k < 3; k++) add(box(1.6, 0.06, 1.0), 0x1e2a44, M(-2.0 + k * 1.75, 5.3, 1.2, -0.35, 0, 0)); lamp(add, -3.2, 3.6, 3.2, 0); lamp(add, 3.2, 3.6, 3.2, 0);
+      add(new THREE.SphereGeometry(0.42, 10, 8), 0xe8e0cc, M(2.6, 0.95, 3.9, 0, 0, 0, 1, 1.3, 1)); add(cyl(0.55, 0.6, 0.5, 10), COL.concrete, M(2.6, 0.25, 3.9)); bench(add, -2.6, 4.2, 0); break; }
+    case 'food': { awning(add, 2.9, 0, 2.55, 1.05, 0, 0xd8321f, 0xf0ece0, 0.9); table(add, 2.4, 2.3, 0xd8321f); lamp(add, -1.9, 1.9, 3.0, 0); add(box(0.9, 1.2, 0.08), 0x1e1e1a, M(1.75, 1.3, 1.3, 0, 0.3, 0)); add(cyl(0.25, 0.22, 0.8, 8), 0x3a5a3a, M(-2.2, 0.4, 0.9)); break; }
+    case 'gift': { awning(add, 3.0, 0, 2.15, 1.55, 0, 0x2a5a7a, 0xf0e8d0, 0.8); add(box(1.0, 1.4, 0.5), COL.woodD, M(1.9, 0.7, 2.1)); for (let k = 0; k < 3; k++) add(new THREE.SphereGeometry(0.16, 6, 5), [0x4a7a3a, 0xc96a2c, 0x8a5aa0][k], M(1.6 + k * 0.3, 1.5, 2.1));
+      // a big green raptor plush on the roof ridge
+      add(new THREE.SphereGeometry(0.5, 8, 6), 0x5a8a3a, M(0, 4.75, 0, 0, 0, 0, 1, 0.8, 1.4)); add(new THREE.SphereGeometry(0.3, 8, 6), 0x5a8a3a, M(0, 5.25, 0.75, 0, 0, 0, 1, 0.9, 1.4)); add(new THREE.ConeGeometry(0.22, 1.2, 6), 0x5a8a3a, M(0, 4.75, -1.0, -1.45, 0, 0));
+      for (const sd of [-1, 1]) add(cyl(0.08, 0.06, 0.7, 5), 0x5a8a3a, M(sd * 0.25, 4.3, 0.1)); lamp(add, -2.0, 2.0, 2.8, 0); break; }
+    case 'restroom': { for (const sd of [-1, 1]){ add(cyl(0.05, 0.05, 2.2, 5), 0x2a2a26, M(sd * 1.95, 1.1, 1.9)); add(box(0.5, 0.5, 0.05), sd > 0 ? 0x2c4a7a : 0x8a2c4a, M(sd * 1.95, 2.25, 1.92)); }
+      add(box(1.2, 0.8, 0.5), 0xd8d8d0, M(0, 0.4, 1.95)); add(cyl(0.18, 0.12, 0.1, 8), 0xa8b0b0, M(0, 0.85, 1.95)); bench(add, -1.2, 2.4, 0); break; }
+    case 'ranger': { add(cyl(0.05, 0.05, 6, 5), COL.metal, M(-3.3, 6.5, -3.2)); for (let k = 0; k < 3; k++) add(box(0.9 - k * 0.25, 0.04, 0.04), COL.metal, M(-3.3, 7.6 + k * 0.9, -3.2));
+      for (const [x, z] of [[1.6, 2.2], [2.4, 2.4], [2.0, 3.0]]) add(box(0.6, 0.5, 0.6), 0x6a5a3a, M(x, 0.65, z)); add(box(3.2, 0.12, 2.8), COL.metal, M(1.8, 3.0, 2.0)); for (const [x, z] of [[0.4, 0.8], [3.2, 0.8], [0.4, 3.2], [3.2, 3.2]]) add(cyl(0.06, 0.06, 2.9, 5), 0x2e3426, M(x, 1.45, z));
+      for (const sd of [-1, 1]) add(box(0.45, 0.3, 0.25), 0xf0e8c0, M(-1 + sd * 2.0, 3.8, 0.7)); flag(add, -3.4, 2.8, 5.5, 0x3c5a34); break; }
+    case 'viewing': { for (const [x, z] of [[-1.9, -1.9], [1.9, -1.9]]) flag(add, x, z, 8.2, COL.amber); add(box(1.0, 0.7, 0.06), 0x2e3a30, M(-1.0, 4.9, 1.9, -0.3, 0, 0)); lamp(add, -2.2, 2.4, 3.0, 0); break; }
+    case 'meat': { add(box(1.8, 0.06, 1.8), 0x5a2a20, M(0, 0.32, 2.9)); for (let k = 0; k < 3; k++) add(cyl(0.05, 0.05, 1.4, 4), 0x2a2a26, M(-0.6 + k * 0.6, 0.7, -0.9)); break; }
+    case 'plant': { add(box(0.8, 0.8, 0.8), 0x8a7a4a, M(2.0, 0.4, 0.6)); add(box(0.8, 0.8, 0.8), 0x9a8a54, M(2.1, 1.2, 0.5, 0, 0.3, 0)); break; }
+  }
+}
+function buildingBase9(type, add){
+  switch (type){
+    case 'pizza': {
+      add(box(3.4, 0.25, 3.4), COL.stone, M(0, 0.12, 0)); add(box(3.0, 2.6, 2.4), 0xb8603a, M(0, 1.55, -0.3)); add(box(2.6, 1.0, 0.1), 0x2a2620, M(0, 1.7, 0.92)); add(box(3.0, 0.9, 0.6), COL.wood, M(0, 0.7, 1.15));
+      add(hip(3.6, 3.0, 1.1), 0x6a3a26, M(0, 2.85, -0.3)); add(cyl(0.3, 0.38, 2.2, 8), 0x8a4a2e, M(1.0, 4.0, -1.0)); add(new THREE.SphereGeometry(0.95, 12, 8, 0, TAU, 0, Math.PI / 2), 0xb8603a, M(-0.9, 2.85, -1.2));
+      add(cyl(1.0, 1.0, 0.16, 16), (v, c) => c.setHex(Math.hypot(v.x, v.z) > 0.82 ? 0xd8a050 : (Math.sin(v.x * 9) * Math.sin(v.z * 9) > 0.55 ? 0xa82a1a : 0xf0c860)), M(0, 4.6, 0.2, Math.PI / 2, 0, 0)); break; }
+    case 'icecream': {
+      add(box(3.2, 0.25, 3.2), COL.concrete, M(0, 0.12, 0)); add(box(2.6, 2.3, 2.2), 0xf2e6e8, M(0, 1.4, -0.2)); add(box(2.2, 0.9, 0.1), 0x3a3a40, M(0, 1.6, 0.92)); add(box(2.6, 0.9, 0.5), 0xe8b0c0, M(0, 0.7, 1.05));
+      add(box(3.0, 0.2, 2.6), 0xe890a8, M(0, 2.65, -0.2)); add(new THREE.ConeGeometry(0.45, 1.6, 10), 0xd8a860, M(0, 3.6, -0.2, Math.PI, 0, 0)); add(new THREE.SphereGeometry(0.5, 12, 8), 0xf4d8e0, M(0, 4.55, -0.2)); add(new THREE.SphereGeometry(0.42, 12, 8), 0x6a3a26, M(0.05, 5.05, -0.2)); add(new THREE.SphereGeometry(0.12, 6, 4), 0xc81a2a, M(0.05, 5.5, -0.2)); break; }
+    case 'coffee': {
+      add(box(3.4, 0.25, 3.4), COL.stone, M(0, 0.12, 0)); add(box(2.8, 2.4, 2.4), COL.wood, M(0, 1.45, -0.3)); add(box(2.2, 0.9, 0.1), 0x2a2620, M(0, 1.7, 0.92)); add(box(2.8, 0.9, 0.55), COL.woodD, M(0, 0.7, 1.1));
+      add(hip(3.6, 3.2, 1.2), 0x2e5a3a, M(0, 2.65, -0.3)); add(cyl(0.42, 0.34, 0.6, 12), 0xf0ece0, M(0, 4.15, -0.3)); add(new THREE.TorusGeometry(0.2, 0.05, 6, 10), 0xf0ece0, M(0.45, 4.15, -0.3)); add(cyl(0.38, 0.38, 0.05, 12), 0x3a2414, M(0, 4.42, -0.3)); break; }
+    case 'drinks': {
+      add(cyl(1.7, 1.75, 0.2, 16), COL.stone, M(0, 0.1, 0)); add(cyl(1.25, 1.25, 1.1, 14, true), COL.wood, M(0, 0.75, 0)); add(cyl(1.35, 1.35, 0.1, 14), COL.woodD, M(0, 1.32, 0)); add(cyl(0.12, 0.14, 3.2, 8), COL.woodD, M(0, 1.6, 0));
+      add(new THREE.ConeGeometry(2.0, 1.3, 12), COL.thatch, M(0, 3.6, 0)); add(box(0.9, 0.7, 0.6), 0x2a6a8a, M(0, 0.55, 0)); for (let k = 0; k < 5; k++){ const a = k / 5 * TAU + 0.3; add(cyl(0.2, 0.2, 0.06, 8), 0xa8321f, M(Math.cos(a) * 1.7, 0.8, Math.sin(a) * 1.7)); add(cyl(0.04, 0.04, 0.8, 4), 0x2a2a26, M(Math.cos(a) * 1.7, 0.4, Math.sin(a) * 1.7)); } break; }
+    case 'restaurant': { // 2x2 = 8m: the Fossil Grill
+      add(box(7.6, 0.4, 7.6), COL.stone, M(0, 0.2, 0)); add(box(6.8, 0.9, 5.0), COL.stoneD, M(0, 0.85, -1.0)); add(box(6.6, 2.6, 4.8), COL.wood, M(0, 2.6, -1.0)); add(box(7.4, 0.25, 5.6), COL.woodD, M(0, 3.95, -1.0));
+      add(hip(7.8, 6.0, 2.4), COL.roof, M(0, 4.0, -1.0)); add(box(1.6, 2.4, 0.12), 0x2a2018, M(0, 1.6, 1.46)); for (const sd of [-1, 1]) add(box(1.6, 1.2, 0.1), COL.glass, M(sd * 2.2, 2.4, 1.46));
+      add(box(7.2, 0.15, 2.6), COL.wood, M(0, 0.48, 2.7)); for (const [x, z] of [[-3.4, 3.9], [3.4, 3.9], [-3.4, 1.6], [3.4, 1.6]]) add(cyl(0.12, 0.14, 3.6, 6), COL.woodD, M(x, 2.2, z)); add(box(7.4, 0.2, 2.8), COL.woodD, M(0, 4.0, 2.75)); break; }
+    case 'stand': { // 2x1 grandstand facing +Z over a lagoon
+      add(box(7.6, 0.3, 3.6), COL.concrete, M(0, 0.15, 0)); for (let k = 0; k < 5; k++) add(box(7.4, 0.5, 0.6), k % 2 ? 0x2a6a8a : 0x3a7a9a, M(0, 0.45 + k * 0.5, 1.2 - k * 0.6));
+      for (let k = 0; k < 5; k++) add(box(7.4, 0.08, 0.42), 0xd8d8d0, M(0, 0.73 + k * 0.5, 1.25 - k * 0.6)); for (const sd of [-1, 1]) add(box(0.2, 2.8, 3.4), COL.concrete, M(sd * 3.7, 1.4, 0));
+      for (const x of [-3.6, 0, 3.6]) add(cyl(0.1, 0.1, 4.6, 6), COL.metal, M(x, 2.3, -1.6)); add(box(8.2, 0.14, 4.2), 0xe8e8e0, M(0, 4.7, -0.1, -0.12, 0, 0)); add(box(7.6, 0.08, 0.1), COL.metal, M(0, 1.3, 1.7)); break; }
+    case 'water': { // pond with muddy banks, reeds and stones (inside an enclosure)
+      const r = mulberry(11); add(new THREE.CylinderGeometry(3.4, 3.7, 0.18, 20), (v, c) => c.setHex(0x5a4a32).offsetHSL(0, 0, (r() - 0.5) * 0.05), M(0, 0.04, 0, 0, 0, 0, 1, 1, 0.82));
+      add(new THREE.CylinderGeometry(2.9, 2.9, 0.06, 20), (v, c) => c.setHex(0x3a4a3c).lerp(_c2.setHex(0x2a5a5a), clamp(1 - Math.hypot(v.x, v.z) / 2.9, 0, 1)), M(0, 0.15, 0, 0, 0, 0, 1, 1, 0.82));
+      for (let k = 0; k < 7; k++){ const a = r() * TAU, d = 2.9 + r() * 0.5; const n = 4 + (r() * 4 | 0); for (let q = 0; q < n; q++){ const h = 0.9 + r() * 0.9; add(cyl(0.02, 0.03, h, 3), 0x5a6a2a, M(Math.cos(a) * d + (r() - 0.5) * 0.4, h / 2, Math.sin(a) * d * 0.82 + (r() - 0.5) * 0.4, (r() - 0.5) * 0.3, 0, (r() - 0.5) * 0.3)); }
+        add(cyl(0.045, 0.045, 0.25, 5), 0x5a3a20, M(Math.cos(a) * d, 1.4, Math.sin(a) * d * 0.82)); }
+      for (let k = 0; k < 6; k++){ const a = r() * TAU; add(new THREE.IcosahedronGeometry(0.25 + r() * 0.3, 0), 0x7a7468, M(Math.cos(a) * 3.3, 0.15, Math.sin(a) * 2.8, r(), r(), r(), 1, 0.6, 1)); } break; }
+    case 'goat': { // live-prey corral
+      add(box(2.8, 0.15, 2.8), 0x6a5a3a, M(0, 0.07, 0)); for (const [x0, z0, x1, z1] of [[-1.3, -1.3, 1.3, -1.3], [-1.3, 1.3, 1.3, 1.3], [-1.3, -1.3, -1.3, 1.3], [1.3, -1.3, 1.3, 1.3]]){ const L = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(x1 - x0, z1 - z0);
+        for (const y of [0.5, 0.95]) add(box(0.08, 0.1, L), COL.wood, M((x0 + x1) / 2, y, (z0 + z1) / 2, 0, a, 0)); add(box(0.12, 1.1, 0.12), COL.woodD, M(x0, 0.55, z0)); }
+      add(box(0.9, 0.5, 0.4), 0xe8e2d4, M(0, 0.75, 0)); add(box(0.32, 0.3, 0.26), 0xe8e2d4, M(0.55, 1.0, 0)); for (const [x, z] of [[-0.3, -0.15], [-0.3, 0.15], [0.3, -0.15], [0.3, 0.15]]) add(cyl(0.04, 0.04, 0.5, 4), 0x3a3026, M(x, 0.25, z));
+      add(cyl(0.1, 0.1, 4.5, 6), COL.woodD, M(-1.6, 2.25, -1.6)); add(box(2.2, 0.12, 0.12), COL.woodD, M(-0.6, 4.4, -1.6)); break; }
+    case 'fish': { // fish basin with a chute
+      add(cyl(1.4, 1.5, 0.7, 14, false), COL.concrete, M(0, 0.35, 0)); add(cyl(1.2, 1.2, 0.05, 14), 0x2a5a6a, M(0, 0.62, 0)); const r = mulberry(5); for (let k = 0; k < 6; k++) add(new THREE.SphereGeometry(0.12, 6, 4), 0xb8c4c8, M((r() - 0.5) * 1.4, 0.68, (r() - 0.5) * 1.4, 0, r() * TAU, 0, 2.2, 0.5, 0.6));
+      add(cyl(0.12, 0.12, 4.0, 6), COL.metal, M(1.8, 2.0, -1.2)); add(box(0.5, 0.2, 2.6), COL.metal, M(1.4, 3.3, -0.2, -0.5, -0.4, 0)); add(box(1.0, 0.9, 0.8), 0x2a6a8a, M(1.8, 4.2, -1.2)); break; }
+    case 'browse': { // tall browse tower for high feeders (sauropods, Therizinosaurus)
+      add(box(1.6, 0.3, 1.6), COL.concrete, M(0, 0.15, 0)); for (const [x, z] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) add(cyl(0.08, 0.1, 9, 6), COL.metal, M(x * (1 - 0) * 1, 4.5, z));
+      for (let k = 1; k < 9; k++) for (const [a, b] of [[[-0.5, -0.5], [0.5, -0.5]], [[0.5, -0.5], [0.5, 0.5]], [[0.5, 0.5], [-0.5, 0.5]], [[-0.5, 0.5], [-0.5, -0.5]]]) add(box(Math.abs(b[0] - a[0]) + 0.05, 0.05, Math.abs(b[1] - a[1]) + 0.05), COL.metal, M((a[0] + b[0]) / 2, k, (a[1] + b[1]) / 2));
+      add(box(3.4, 0.15, 0.2), COL.metal, M(1.2, 9.0, 0)); const r = mulberry(13); for (let k = 0; k < 14; k++) add(new THREE.IcosahedronGeometry(0.45 + r() * 0.3, 0), _c2.setHex(0x4e7a2e).offsetHSL((r() - 0.5) * 0.04, 0, (r() - 0.5) * 0.08).getHex(), M(2.4 + (r() - 0.5) * 1.0, 7.6 + r() * 1.3, (r() - 0.5) * 1.0));
+      add(cyl(0.02, 0.02, 1.2, 3), 0x2a2a26, M(2.4, 8.4, 0)); break; }
+    case 'insect': { // small-prey box: logs, a crate of crickets and rodents
+      add(box(1.4, 0.8, 1.0), COL.wood, M(0, 0.4, 0)); add(box(1.45, 0.06, 1.05), 0x3a3a36, M(0, 0.82, 0)); for (let k = 0; k < 4; k++) add(box(0.04, 0.03, 1.0), 0x8a8a84, M(-0.5 + k * 0.33, 0.86, 0));
+      add(cyl(0.22, 0.22, 2.2, 8), 0x5a4a36, M(1.2, 0.22, 0.8, 0, 0, Math.PI / 2)); add(cyl(0.18, 0.18, 1.6, 8), 0x5d5444, M(-1.1, 0.18, -0.7, 0, 0.6, Math.PI / 2)); break; }
+  }
+}
+/* ---------- v9 building colour schemes: walls / roofs / trim are tagged per vertex (role + brightness relative to the role's base colour)
+   so a palette is a uniform swap in the shader - one material per palette, no extra draw calls ---------- */
+const ROLE_COLS = [[COL.cream, 0xe9e7df, 0xd8d2c2, COL.concrete, 0xb8603a, 0xf2e6e8, 0xd8d6ce], [COL.thatch, COL.thatchD, COL.roof, 0x6a3a26, 0x2e5a3a, 0x8f938f, 0xe890a8, 0x3c5a6a, 0xe8e8e0], [COL.wood, COL.woodD, 0x56603e, 0x5a605c, 0x2e3426, 0x2a3a44]];
+const _rc = ROLE_COLS.map(a => a.map(h => new THREE.Color(h)));
+const lum = c => c.r * 0.3 + c.g * 0.59 + c.b * 0.11;
+function palRoles(g){ const col = g.attributes.color, n = col.count, a = new Float32Array(n * 2); const c = new THREE.Color();
+  for (let i = 0; i < n; i++){ c.fromBufferAttribute(col, i); let role = 0, ref = null; for (let r = 0; r < 3 && !role; r++) for (const rc of _rc[r]) if (Math.abs(rc.r - c.r) + Math.abs(rc.g - c.g) + Math.abs(rc.b - c.b) < 0.02){ role = r + 1; ref = _rc[r][0]; break; }
+    a[i * 2] = role; a[i * 2 + 1] = role ? clamp(lum(c) / Math.max(0.05, lum(ref)), 0.25, 2.2) : 1; }
+  g.setAttribute('aPal', new THREE.BufferAttribute(a, 2)); }
+export const BLD_PALETTES = [
+  { id: 'classic', name: 'Classic', cols: null },
+  { id: 'lodge', name: 'Jungle Lodge', cols: [0xc8b48a, 0x4a5a2e, 0x4a3420] },
+  { id: 'safari', name: 'Safari Sand', cols: [0xe2d2a8, 0xa88a50, 0x7a5a34] },
+  { id: 'tropical', name: 'Tropical', cols: [0xf0e6d0, 0x2a7a8a, 0xc8502a] },
+  { id: 'modern', name: 'Modern White', cols: [0xeeeeea, 0x5a6266, 0x2a2e30] },
+  { id: 'volcanic', name: 'Volcanic', cols: [0x5a5048, 0x2a2624, 0xb8401a] },
+];
 /* ---------- signs: one canvas atlas (2 x 4 slots of 512 x 128) shared by every building ---------- */
 export const SIGN = { visitor: [0, 'VISITOR CENTRE', '#2a1c10', '#e8a93a'], hatchery: [1, 'HATCHERY', '#e8e6de', '#1e2a2e'], food: [2, 'SNACKS', '#a8321f', '#f4ead0'], gift: [3, 'GIFT SHOP', '#3a2a18', '#e8c060'],
-  restroom: [4, 'RESTROOMS', '#2c4a5c', '#f0f0e8'], ranger: [5, 'RANGERS', '#33402a', '#f2c230'] };
+  restroom: [4, 'RESTROOMS', '#2c4a5c', '#f0f0e8'], ranger: [5, 'RANGERS', '#33402a', '#f2c230'],
+  pizza: [6, 'PIZZA', '#1e5a2e', '#f4ead0'], icecream: [7, 'ICE CREAM', '#f2d8e0', '#8a2a4a'], coffee: [8, 'COFFEE', '#2a1c12', '#e8d2a8'], drinks: [9, 'COLD DRINKS', '#1c5a7a', '#f6f0d8'],
+  restaurant: [10, 'FOSSIL GRILL', '#3a2414', '#f0b048'], stand: [11, 'LAGOON SHOW', '#123a5a', '#e8f0f0'], aviary: [12, 'AVIARY', '#2a3a2a', '#e8e0c0'] };
 const SIGN_POS = { visitor: [[0, 4.55, 5.39, 3.9, 0.66, 0]], hatchery: [[0, 4.2, 2.69, 3.0, 0.6, 0]], food: [[0, 4.15, 0.82, 2.2, 0.55, 0], [0, 4.15, 0.68, 2.2, 0.55, Math.PI]], gift: [[0, 2.6, 1.61, 1.75, 0.44, 0]],
-  restroom: [[0, 2.38, 1.36, 2.0, 0.4, 0]], ranger: [[-1, 3.15, 0.66, 2.2, 0.48, 0]] };
+  restroom: [[0, 2.38, 1.36, 2.0, 0.4, 0]], ranger: [[-1, 3.15, 0.66, 2.2, 0.48, 0]],
+  pizza: [[0, 3.05, 1.36, 2.2, 0.55, 0]], icecream: [[0, 2.75, 1.26, 2.0, 0.5, 0]], coffee: [[0, 2.85, 1.42, 2.1, 0.5, 0]], drinks: [[0, 2.05, 1.66, 2.0, 0.45, 0]],
+  restaurant: [[0, 5.2, 3.32, 4.2, 0.9, 0]], stand: [[0, 5.3, -0.2, 3.6, 0.7, 0]] };
 export function signAtlasCanvas(){
-  const c = mk(1024, 512), g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 1024, 512); // bottom row stays white: building bodies sample it
+  const c = mk(1024, 1024), g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 1024, 1024); // bottom row stays white: building bodies sample it
   for (const k in SIGN){ const [slot, text, bg, fg] = SIGN[k]; const x = (slot % 2) * 512, y = (slot >> 1) * 128;
     g.fillStyle = bg; g.fillRect(x, y, 512, 128); g.strokeStyle = fg; g.globalAlpha = 0.85; g.lineWidth = 6; g.strokeRect(x + 10, y + 10, 492, 108); g.globalAlpha = 1;
     let fs = 78; g.font = `900 ${fs}px Georgia, "Times New Roman", serif`; while (g.measureText(text).width > 440 && fs > 30){ fs -= 2; g.font = `900 ${fs}px Georgia, "Times New Roman", serif`; }
@@ -295,14 +402,15 @@ export function signAtlasCanvas(){
   return c;
 }
 export function signGeo(type){
-  const S = SIGN[type], P = SIGN_POS[type]; if (!S || !P) return null; const slot = S[0], u0 = (slot % 2) * 0.5, v1 = 1 - (slot >> 1) * 0.25, v0 = v1 - 0.25;
-  const geos = P.map(([x, y, z, w, h, ry]) => { const g = new THREE.PlaneGeometry(w, h); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * 0.5, v0 + uv.getY(i) * 0.25); g.rotateY(ry); g.translate(x, y, z); return g; });
+  const S = SIGN[type], P = SIGN_POS[type]; if (!S || !P) return null; const slot = S[0], u0 = (slot % 2) * 0.5, v1 = 1 - (slot >> 1) * 0.125, v0 = v1 - 0.125;
+  const geos = P.map(([x, y, z, w, h, ry]) => { const g = new THREE.PlaneGeometry(w, h); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * 0.5, v0 + uv.getY(i) * 0.125); g.rotateY(ry); g.translate(x, y, z); return g; });
   return mergeGeometries(geos, false);
 }
 export function buildingGeo(type, hi = true){
   const P = [];
   const add = (g, col, m) => P.push([g, col, m]);
-  if (hi) buildingDetail(type, add);
+  if (hi){ buildingDetail(type, add); buildingDetail9(type, add); }
+  buildingBase9(type, add);
   switch (type){
     case 'gate': { // 2 tiles wide (8m) x 1 deep; opening along Z
       for (const sd of [-1, 1]){ add(cyl(0.75, 0.9, 12, 10), COL.woodD, M(sd * 5.2, 6, 0)); add(cyl(0.95, 1.05, 1.2, 10), COL.stone, M(sd * 5.2, 0.6, 0));
@@ -362,11 +470,14 @@ export function buildingGeo(type, hi = true){
       break; }
   }
   // body uvs sit in the sign atlas' white row; they vary slightly with position because constant uvs (zero derivatives) sparkled black in WebKit
-  const body = mergeColored(P); const n = body.attributes.position.count; const uv = new Float32Array(n * 2); const bp = body.attributes.position; for (let k = 0; k < n; k++){ uv[k*2] = 0.5 + bp.getX(k) * 0.004 + bp.getZ(k) * 0.002; uv[k*2+1] = 0.1 + bp.getY(k) * 0.002; } body.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); // white row of the sign atlas
+  const body = mergeColored(P); const n = body.attributes.position.count; const uv = new Float32Array(n * 2); const bp = body.attributes.position; for (let k = 0; k < n; k++){ uv[k*2] = 0.5 + bp.getX(k) * 0.004 + bp.getZ(k) * 0.002; uv[k*2+1] = 0.03 + bp.getY(k) * 0.0015; } body.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); // white row of the sign atlas
+  palRoles(body);
   const sg = hi ? signGeo(type) : null; if (!sg) return body;
+  sg.setAttribute('aPal', new THREE.BufferAttribute(new Float32Array(sg.attributes.position.count * 2), 2));
   sg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(sg.attributes.position.count * 3).fill(1), 3)); if (sg.index) return mergeGeometries([body, sg.toNonIndexed()], false); return mergeGeometries([body, sg], false);
 }
-export const FOOT = { gate: [2, 1], visitor: [3, 3], hatchery: [2, 2], meat: [1, 1], plant: [1, 1], viewing: [1, 1], food: [1, 1], gift: [1, 1], restroom: [1, 1], ranger: [2, 2] };
+export const FOOT = { gate: [2, 1], visitor: [3, 3], hatchery: [2, 2], meat: [1, 1], plant: [1, 1], viewing: [1, 1], food: [1, 1], gift: [1, 1], restroom: [1, 1], ranger: [2, 2],
+  pizza: [1, 1], icecream: [1, 1], coffee: [1, 1], drinks: [1, 1], restaurant: [2, 2], stand: [2, 1], water: [1, 1], goat: [1, 1], fish: [1, 1], browse: [1, 1], insect: [1, 1] };
 
 /* ---------------- fences: panel spans x in [-2,2] at local origin, posts separate. hi adds per-tier detail (v7); lo is the v6 shape ---------------- */
 function sagWire(y, z, sag, r = 0.02){ const pts = []; for (let k = 0; k <= 8; k++){ const t = k / 8; pts.push(new THREE.Vector3(-2 + 4 * t, y - sag * 4 * t * (1 - t), z)); } return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 8, r, 3, false); }

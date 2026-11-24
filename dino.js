@@ -199,6 +199,231 @@ const SPECIES = {
       P.cone(hb, hb, [0, H[1] - .08, H[0] + .86], [0, H[1] - .14, H[0] + .98], .1, .04, { k: .04, sx: 1.5, reg: F.beak });
       P.ell(hb, [0, H[1] + .18, H[0] + .25], [.44, .12, .35], { k: .08 }); // flat armoured skull roof
     } },
+
+  /* ---------------- v9 land species ---------------- */
+  /* ---------- v9 flying reptiles (aviary): pterosaurs are not dinosaurs - wings are skin membranes stretched from a hugely elongated fourth finger to the ankle ---------- */
+  ptera: { // Pteranodon longiceps: ~6 m span, toothless beak, long backswept crest (male), short body and tail
+    size: 3.0, gait: 'fly', mode: 'fly', scaleF: 6, beakAll: true, noTeeth: true,
+    nodes: [[-.62,.5,.008,.01,.01],[-.48,.5,.02,.025,.025],[-.32,.505,.05,.06,.06],[-.15,.515,.095,.1,.1],[.02,.525,.115,.12,.125],[.18,.545,.115,.12,.115],
+      [.31,.6,.062,.065,.06],[.43,.68,.052,.056,.052],[.55,.75,.048,.052,.048],[.67,.8,.062,.075,.055],[.85,.795,.052,.062,.04],[1.07,.78,.04,.046,.028],[1.3,.765,.028,.032,.018],[1.52,.75,.016,.02,.011],[1.68,.742,.006,.008,.005]],
+    pel: 3, chest: 5, head: 9,
+    jaw: { hinge: [-.035, .02], pts: [[0,0,.048,.018,.034],[.3,-.008,.036,.014,.024],[.62,-.016,.022,.01,.014],[.98,-.022,.006,.004,.004]] },
+    eye: { p: [.042, .028, .05], r: .02, gaze: [.85, .1, .5], pupil: 'round', iris: '#c8902a' },
+    legs: [{ hind: true, at: [.07, .5, -.16], j: [[0,0,0,.045],[0,-.2,.07,.026],[0,-.42,-.03,.016],[0,-.485,.02,.013],[0,-.5,.09,.007]], sx: [1,1,1,1,1], thigh: [.01,-.06,.01,.04,.08,.05], toes: { n: 4, spread: .22, len: [.8,1,1,.85] } }],
+    chains: [{ tag: 'wing', parent: 'chest', pts: [[.09,.56,.2,.042],[.42,.585,.12,.03],[.95,.6,.22,.024],[1.28,.605,.28,.018],[2.95,.59,-.08,.006]], rigidFrom: 0 }],
+    wing: { chord: .52, droop: .02 },
+    col: { top: 0x7a6a58, belly: 0xd8d0c0, mark: 0x3a2e24, pat: 0, patF: .7, mouth: 0x7a3a30, claw: 0x221d17, beak: 0xc8a050, crest: 0xa8402a, bone: 0x6a5a48 },
+    feat(P, c){ const { H, hb, F } = c;
+      P.cone(hb, hb, [0, H[1] + .015, H[0] + .1], [0, H[1] - .03, H[0] + 1.0], .05, .006, { reg: F.beak, k: .02 });
+      P.ell(4, [.07, .56, .16], [.06, .05, .08], { k: .03, mirror: true }); // flight muscles at the shoulders
+    } },
+  dimor: { // Dimorphodon macronyx: ~1.4 m span, deep puffin-like skull with two kinds of teeth, long stiff tail
+    size: 1.25, gait: 'fly', mode: 'fly', scaleF: 12, teeth: [7, 8], toothL: .014,
+    nodes: [[-.62,.3,.004,.006,.006],[-.48,.302,.007,.009,.009],[-.33,.305,.011,.013,.013],[-.19,.308,.018,.021,.021],[-.06,.312,.034,.038,.04],[.04,.32,.042,.046,.048],[.12,.33,.04,.044,.042],
+      [.18,.37,.022,.025,.023],[.23,.41,.021,.023,.021],[.275,.44,.034,.046,.042],[.33,.44,.03,.05,.036],[.385,.432,.022,.04,.026],[.435,.422,.012,.026,.015],[.468,.414,.005,.011,.006]],
+    pel: 4, chest: 6, head: 9,
+    jaw: { hinge: [-.02, .0], pts: [[0,0,.03,.01,.02],[.08,-.006,.022,.009,.015],[.15,-.009,.012,.006,.008],[.195,-.009,.004,.003,.003]] },
+    eye: { p: [.022, .018, .018], r: .01, gaze: [.85, .1, .5], pupil: 'round', iris: '#d8a030' },
+    legs: [{ hind: true, at: [.035, .3, -.06], j: [[0,0,0,.02],[0,-.12,.045,.012],[0,-.25,-.012,.008],[0,-.29,.012,.007],[0,-.3,.05,.004]], sx: [1,1,1,1,1], thigh: [.005,-.035,.005,.016,.035,.022], toes: { n: 4, spread: .22, len: [.8,1,1,.85] } }],
+    chains: [{ tag: 'wing', parent: 'chest', pts: [[.035,.335,.115,.016],[.15,.345,.07,.012],[.31,.352,.12,.0095],[.37,.354,.15,.008],[.73,.35,-.01,.0028]], rigidFrom: 0 }],
+    wing: { chord: .2, droop: .01 },
+    col: { top: 0x3e3a34, belly: 0xc8bea8, mark: 0x1a1612, pat: 3, patF: 1.2, mouth: 0x8a3a30, claw: 0x221d17, beak: 0x2a241c, bone: 0x2a2620 },
+    feat(P, c){ const { H, hb } = c;
+      P.ell(hb, [0, H[1] + .02, H[0] + .06], [.026, .04, .06], { k: .012 }); // deep, narrow skull
+      P.sub(hb, [.02, H[1] + .015, H[0] + .1], [.008, .016, .022], { k: .004, mirror: true }); // big antorbital/nasal openings, skin-covered
+    } },
+  /* ---------- v9 marine reptiles (ocean lagoon) ---------- */
+  mosa: { // Mosasaurus hoffmannii: ~13 m, crocodile-like skull with conical teeth, four paddles, downturned (hypocercal) tail with a crescent fluke
+    size: 13, gait: 'swim', mode: 'swim', scaleF: .9, swimTail: .16, finStroke: .18, hipH0: 0,
+    nodes: [[-6.5,-.85,.03,.05,.05],[-6.0,-.52,.07,.11,.11],[-5.35,-.24,.11,.22,.2],[-4.55,-.04,.16,.36,.33],[-3.65,.03,.22,.45,.42],[-2.6,.04,.3,.48,.48],[-1.35,.03,.41,.52,.56],
+      [0,0,.5,.56,.63],[1.5,0,.58,.6,.68],[2.8,0,.58,.6,.66],[3.9,.02,.5,.52,.55],[4.75,.05,.4,.4,.42],[5.55,.09,.34,.33,.3],[6.15,.07,.27,.26,.2],[6.65,.03,.2,.19,.14],[7.05,0,.14,.13,.1],[7.3,-.02,.08,.09,.07]],
+    pel: 7, chest: 10, head: 12,
+    jaw: { hinge: [-.12, .05], pts: [[0,0,.32,.08,.22],[.55,-.05,.24,.07,.16],[1.1,-.06,.15,.05,.1],[1.62,-.05,.07,.03,.05]] },
+    eye: { p: [.22, .13, .2], r: .065, gaze: [.9, .1, .4], pupil: 'round', iris: '#c8a040' },
+    teeth: [13, 12], toothL: .12, legs: [],
+    chains: [{ tag: 'fin', front: true, parent: 'chest', pts: [[.42,-.32,3.65,.16],[1.0,-.58,3.35,.1],[1.65,-.72,2.95,.05]], ell: [[1, [1.12,-.6,3.25], [.78,.085,.3], [0,.5,0]]] },
+             { tag: 'fin', parent: 'pel', pts: [[.4,-.38,.6,.13],[.85,-.58,.35,.08],[1.25,-.68,.05,.04]], ell: [[1, [.9,-.58,.3], [.55,.08,.24], [0,.55,0]]] }],
+    sails: [{ s0: 0, s1: 2.2, h: [[0, 1.05], [.6, .85], [1.3, .45], [2.2, .05]], th: .05 }],
+    col: { top: 0x3a4652, belly: 0xd8dcd8, mark: 0x1e262e, pat: 4, patF: 1, mouth: 0x8a4a46 },
+    feat(P, c){ const { H, hb } = c; P.ell(hb, [.17, H[1] + .1, H[0] + .25], [.1, .07, .18], { k: .06, mirror: true }); } },
+  elasmo: { // Elasmosaurus platyurus: ~10 m, more than half of it neck; small head with long interlocking teeth; broad flat body and four long flippers
+    size: 10, gait: 'swim', mode: 'swim', scaleF: 1, swimTail: .03, finStroke: .5, neckSway: 1, hipH0: 0,
+    nodes: [[-3.3,0,.03,.04,.04],[-2.75,0,.1,.12,.12],[-2.1,0,.22,.22,.22],[-1.3,0,.44,.32,.36],[-.5,0,.72,.4,.46],[0,0,.86,.42,.5],[.8,0,.9,.42,.52],[1.6,.01,.84,.4,.48],
+      [2.35,.06,.48,.3,.3],[3.25,.16,.3,.24,.24],[4.25,.3,.22,.2,.2],[5.25,.46,.18,.17,.17],[6.25,.62,.15,.145,.145],[7.25,.76,.13,.125,.125],[8.2,.88,.115,.11,.11],[8.95,.95,.115,.115,.085],[9.25,.94,.09,.09,.06],[9.5,.92,.06,.07,.04],[9.66,.91,.03,.04,.025]],
+    pel: 5, chest: 7, head: 15,
+    jaw: { hinge: [-.035, .02], pts: [[0,0,.09,.03,.05],[.25,-.01,.07,.025,.035],[.5,-.012,.04,.02,.02],[.68,-.012,.02,.012,.012]] },
+    eye: { p: [.075, .05, .06], r: .032, gaze: [.85, .2, .45], pupil: 'round', iris: '#b8983a' },
+    teeth: [10, 9], toothL: .07, legs: [],
+    chains: [{ tag: 'fin', front: true, parent: 'chest', pts: [[.7,-.24,1.45,.2],[1.5,-.42,1.15,.12],[2.45,-.52,.72,.05]], ell: [[1, [1.65,-.44,1.05], [.98,.1,.34], [0,.5,0]], [0, [1.05,-.33,1.35], [.5,.11,.34], [0,.3,0]]] },
+             { tag: 'fin', parent: 'pel', pts: [[.7,-.24,-.1,.18],[1.42,-.42,-.36,.11],[2.25,-.52,-.76,.05]], ell: [[1, [1.48,-.44,-.42], [.88,.1,.3], [0,.5,0]], [0, [1.0,-.33,-.2], [.45,.11,.3], [0,.3,0]]] }],
+    col: { top: 0x4a5a52, belly: 0xdcd8c8, mark: 0x26302a, pat: 2, patF: .8, mouth: 0x8a4a46 },
+    feat(P, c){} },
+  /* ---------- v9 freshwater (lake enclosure) ---------- */
+  spino: { // Spinosaurus aegyptiacus (2020-24 view): long low body on short hind legs, tall sail peaking over the hips, paddle-like tail, long narrow snout with conical teeth
+    size: 14, gait: 'biped', scaleF: 1, teeth: [15, 14], toothL: .11, clawF: 1.7, wader: true,
+    nodes: [[-7.6,1.55,.02,.1,.08],[-6.6,1.66,.05,.36,.3],[-5.5,1.8,.09,.52,.42],[-4.3,1.93,.14,.56,.44],[-3.1,2.05,.21,.52,.46],[-1.9,2.15,.3,.48,.5],[-.8,2.22,.42,.5,.6],
+      [0,2.25,.5,.55,.7],[1.0,2.25,.55,.55,.85],[2.0,2.22,.55,.55,.9],[2.9,2.25,.46,.48,.72],[3.6,2.6,.25,.26,.3],[4.2,3.05,.2,.21,.22],[4.8,3.38,.18,.19,.18],
+      [5.4,3.52,.2,.24,.16],[5.95,3.43,.14,.19,.1],[6.45,3.32,.1,.14,.08],[6.85,3.25,.085,.11,.07],[7.12,3.22,.08,.095,.065]],
+    pel: 7, chest: 10, head: 14,
+    jaw: { hinge: [-.12, .15], pts: [[0,0,.17,.06,.12],[.5,-.03,.11,.05,.08],[1.0,-.05,.08,.04,.06],[1.5,-.045,.075,.035,.05]] },
+    eye: { p: [.15, .12, .22], r: .05, gaze: [.85, .1, .5], pupil: 'slit', iris: '#c8a02a' },
+    legs: [
+      { hind: true, at: [.45, 2.1, .1], j: [[0,0,0,.42],[0,-.8,.35,.22],[0,-1.55,-.15,.12],[0,-2.0,.1,.1],[0,-2.1,.55,.05]], sx: [.76,.8,.9,1.1,1.2],
+        thigh: [.05,-.3,.05,.34,.58,.46], calf: [0,-1.1,.12,.16,.3,.18], toes: { n: 3, spread: .32, len: [.85,1,.9] } },
+      { arm: true, at: [.4, 1.95, 2.75], j: [[0,0,0,.17],[.05,-.55,-.2,.12],[.07,-.95,.2,.085],[.07,-1.1,.6,.04]], sx: [1,1,1,1], fingers: 3 }],
+    sails: [{ s0: 3.6, s1: 11.6, h: [[3.6, 0], [4.6, .55], [5.8, 1.15], [7.0, 1.6], [8.0, 1.55], [9.2, 1.2], [10.4, .7], [11.6, 0]], th: .07, col: 0x8a5a3a }],
+    col: { top: 0x5a5244, belly: 0xd4c8a8, mark: 0x2a2620, pat: 3, patF: 1.1, mouth: 0x7a2e2a, crest: 0x8a4a2a, claw: 0x221d17 },
+    feat(P, c){ const { H, hb } = c;
+      P.ell(hb, [0, H[1] + .16, H[0] + .45], [.07, .1, .28], { k: .05 }); // small fluted crest in front of the eyes
+      P.ell(hb, [0, H[1] - .06, H[0] + 1.62], [.12, .1, .14], { k: .06 }); // terminal rosette of the snout
+      P.ell(hb, [.13, H[1] + .1, H[0] + .18], [.08, .06, .14], { k: .04, mirror: true });
+    } },
+  sarco: { // Sarcosuchus imperator: ~9.5 m crocodyliform, long broad snout ending in a bony bulla, rows of osteoderms, sprawling limbs
+    size: 9.5, gait: 'quad', trot: .2, scaleF: 1.3, square: true, osteo: true, noClub: true, teeth: [17, 15], toothL: .075, wader: true,
+    nodes: [[-4.6,.52,.03,.06,.05],[-3.9,.58,.08,.17,.12],[-3.1,.64,.14,.21,.16],[-2.3,.7,.22,.24,.2],[-1.5,.76,.3,.26,.24],[-.7,.8,.4,.25,.3],[0,.83,.5,.24,.35],[.8,.84,.58,.24,.4],[1.6,.83,.58,.24,.4],[2.3,.82,.5,.22,.36],
+      [2.9,.82,.36,.18,.24],[3.35,.84,.32,.16,.16],[3.9,.8,.24,.12,.085],[4.5,.76,.17,.09,.06],[5.0,.74,.15,.08,.055],[5.25,.75,.17,.095,.06]],
+    pel: 6, chest: 9, head: 11,
+    jaw: { hinge: [-.06, -.05], pts: [[0,0,.3,.06,.12],[.6,-.02,.2,.05,.08],[1.2,-.03,.15,.04,.06],[1.85,-.03,.15,.04,.06]] },
+    eye: { p: [.13, .13, .14], r: .045, gaze: [.6, .45, .6], pupil: 'slit', iris: '#b8a030' },
+    legs: [
+      { hind: true, at: [.45, .66, 0], j: [[0,0,0,.2],[.32,-.26,.2,.12],[.42,-.6,-.05,.08],[.45,-.64,.1,.06],[.47,-.66,.36,.03]], sx: [1,1,1,1,1], thigh: [.12,-.06,0,.2,.2,.26], toes: { n: 4, spread: .4, len: [.8,1,1,.8] } },
+      { front: true, at: [.42, .66, 2.2], j: [[0,0,0,.14],[.28,-.24,-.12,.09],[.36,-.58,.02,.06],[.38,-.63,.1,.05],[.4,-.66,.28,.025]], sx: [1,1,1,1,1], toes: { n: 5, spread: .5, len: [.7,.9,1,.9,.7] } }],
+    col: { top: 0x4a4a36, belly: 0xc8c0a0, mark: 0x26261a, pat: 3, patF: 1.4, mouth: 0xa86a5a, osteo: 0x3a3a2a, claw: 0x221d17 },
+    feat(P, c){ const { H, hb } = c;
+      P.ell(hb, [0, H[1] + .02, H[0] + 1.85], [.2, .13, .2], { k: .08 }); // the bulla at the snout tip
+      P.ell(hb, [.13, H[1] + .1, H[0] + .1], [.07, .06, .1], { k: .04, mirror: true }); // raised orbits
+    } },
+  allo: {
+    size: 8.5, gait: 'biped', scaleF: 1.9, teeth: [14, 13], toothL: .055, clawF: 1.35,
+    // after Paul / Hartman skeletals of Allosaurus fragilis: long low skull with lacrimal horns and paired nasal ridges, longer neck than T. rex,
+    // big three-fingered hands, slimmer body, long tail held level
+    nodes: [[-4.6,1.95,.03,.03,.03],[-3.8,2.08,.09,.1,.1],[-2.95,2.2,.16,.18,.18],[-2.1,2.3,.24,.28,.3],[-1.2,2.38,.33,.38,.44],
+      [-.3,2.42,.42,.44,.6],[.55,2.38,.47,.42,.72],[1.3,2.42,.43,.4,.66],[1.85,2.62,.27,.28,.36],[2.2,2.95,.2,.21,.22],
+      [2.5,3.2,.16,.17,.1],[2.78,3.18,.14,.15,.085],[3.05,3.1,.105,.12,.065],[3.25,3.03,.075,.09,.05],[3.38,2.99,.035,.05,.03]],
+    pel: 5, chest: 7, head: 10,
+    jaw: { hinge: [-.08, .06], pts: [[0,0,.14,.05,.09],[.3,-.02,.12,.045,.07],[.6,-.03,.085,.035,.045],[.82,-.03,.03,.02,.02]] },
+    eye: { p: [.13, .08, .13], r: .034, gaze: [.85, .05, .52], pupil: 'slit', iris: '#c89a3a' },
+    legs: [
+      { hind: true, at: [.3, 2.3, .1], j: [[0,0,0,.34],[0,-.88,.33,.18],[0,-1.66,-.24,.09],[0,-2.22,.07,.075],[0,-2.28,.5,.034]], sx: [.76,.8,.9,1.1,1.2],
+        thigh: [.04,-.28,.05, .27,.52,.4], calf: [0,-1.1,.1, .12,.26,.15], toes: { n: 3, spread: .34, len: [.82,1,.86] } },
+      { arm: true, at: [.24, 2.18, 1.45], j: [[0,0,0,.1],[.03,-.42,-.18,.07],[.04,-.68,.14,.05],[.04,-.78,.46,.022]], sx: [1,1,1,1], fingers: 3 }],
+    col: { top: 0x6a5a44, belly: 0xc8b490, mark: 0x3a2a1a, pat: 3, patF: 1.8, mouth: 0x6e2a26, claw: 0x221d17, horn: 0x5a3a26 },
+    feat(P, c){ const { H, hb, F } = c;
+      P.ell(hb, [.1, H[1] + .15, H[0] + .2], [.04, .06, .075], { k: .03, mirror: true, reg: F.horn }); // lacrimal horns in front of the eyes
+      P.ell(hb, [.045, H[1] + .12, H[0] + .52], [.025, .035, .26], { k: .03, mirror: true }); // paired nasal ridges
+      P.ell(hb, [.1, H[1] - .02, H[0] + .1], [.06, .08, .12], { k: .04, mirror: true }); // jaw muscles
+      P.sub(hb, [.14, H[1] + .07, H[0] + .14], [.034, .03, .034], { k: .01, mirror: true });
+      P.sub(hb, [.06, H[1] - .02, H[0] + .4], [.03, .04, .09], { k: .02, mirror: true }); // antorbital fenestra
+      P.sub(hb, [.03, H[1] + .03, H[0] + .8], [.014, .012, .02], { k: .006, mirror: true });
+      P.ell(c.hb - 2, [0, 2.75, 1.95], [.24, .2, .34], { k: .15, rot: [-.7, 0, 0] }); // neck musculature
+    } },
+  carno: {
+    size: 7.8, gait: 'biped', scaleF: 2, teeth: [12, 12], toothL: .04,
+    // Carnotaurus sastrei: short, very deep skull with thick horns over the eyes, muscular neck, deep chest, long legs,
+    // vestigial forearms, long slender tail; rows of low scutes along the flanks
+    nodes: [[-4.5,2.05,.03,.03,.03],[-3.7,2.2,.08,.09,.09],[-2.85,2.33,.14,.17,.17],[-2.0,2.43,.22,.27,.29],[-1.1,2.5,.31,.38,.44],
+      [-.2,2.52,.4,.44,.6],[.6,2.47,.45,.42,.74],[1.3,2.5,.42,.4,.7],[1.88,2.78,.31,.33,.4],[2.22,3.1,.25,.27,.27],
+      [2.52,3.3,.2,.22,.12],[2.77,3.29,.18,.21,.11],[2.99,3.22,.14,.17,.09],[3.15,3.13,.1,.12,.06],[3.24,3.07,.05,.06,.03]],
+    pel: 5, chest: 7, head: 10,
+    jaw: { hinge: [-.1, .06], pts: [[0,0,.17,.05,.11],[.25,-.03,.15,.045,.09],[.5,-.03,.11,.035,.05],[.66,-.03,.05,.02,.025]] },
+    eye: { p: [.15, .11, .15], r: .032, gaze: [.82, .05, .57], pupil: 'slit', iris: '#b8862a' },
+    legs: [
+      { hind: true, at: [.3, 2.36, .05], j: [[0,0,0,.33],[0,-.94,.34,.17],[0,-1.76,-.22,.085],[0,-2.29,.07,.07],[0,-2.35,.5,.032]], sx: [.76,.8,.9,1.1,1.2],
+        thigh: [.04,-.3,.05, .27,.54,.4], calf: [0,-1.16,.1, .12,.27,.15], toes: { n: 3, spread: .34, len: [.82,1,.86] } },
+      { arm: true, at: [.26, 2.2, 1.5], j: [[0,0,0,.085],[.03,-.21,-.02,.065],[.04,-.3,.05,.045],[.04,-.34,.12,.02]], sx: [1,1,1,1], fingers: 3 }],
+    col: { top: 0x7a4a34, belly: 0xcbb08e, mark: 0x3a2418, pat: 1, patF: 2.0, mouth: 0x6e2a26, claw: 0x221d17, horn: 0x4a2c20 },
+    feat(P, c){ const { H, hb, F, atS, owner } = c;
+      P.cone(hb, hb, [.1, H[1] + .17, H[0] + .1], [.3, H[1] + .36, H[0] + .0], .075, .03, { k: .04, mirror: true, reg: F.horn }); // brow horns
+      P.ell(hb, [.13, H[1] - .02, H[0] + .1], [.08, .12, .13], { k: .05, mirror: true }); // deep cheeks
+      P.ell(hb, [.04, H[1] + .15, H[0] + .4], [.04, .05, .2], { k: .04, mirror: true }); // rugose snout
+      P.sub(hb, [.16, H[1] + .1, H[0] + .16], [.034, .03, .034], { k: .01, mirror: true });
+      P.sub(hb, [.03, H[1] + .03, H[0] + .66], [.014, .012, .02], { k: .006, mirror: true });
+      P.ell(c.hb - 2, [0, 2.95, 2.0], [.3, .24, .36], { k: .16, rot: [-.7, 0, 0] });
+      for (let s = 3.2; s < 7.6; s += .42){ const sp = atS(s); for (const row of [.5, .78]){ const a = row; // low scute rows along the flanks
+        P.ell(owner(Math.floor(s)), [Math.sin(a) * sp[2] * .98, sp[1] + Math.cos(a) * sp[3] * .98, sp[0]], [.05, .035, .07], { k: .015, mirror: true }); } }
+    } },
+  pachy: {
+    size: 4.5, gait: 'biped', scaleF: 3, clawF: .8,
+    // Pachycephalosaurus: thick bony dome ringed with knobs, short neck, broad gut, small arms, stiff tail
+    nodes: [[-2.4,1.1,.025,.025,.025],[-2.0,1.2,.06,.07,.07],[-1.5,1.3,.11,.13,.13],[-.95,1.38,.18,.22,.22],[-.4,1.42,.26,.3,.34],
+      [.1,1.42,.33,.33,.45],[.6,1.38,.34,.32,.47],[1.0,1.38,.27,.28,.36],[1.3,1.5,.17,.18,.2],[1.45,1.66,.13,.14,.13],
+      [1.6,1.78,.14,.17,.09],[1.76,1.75,.11,.13,.075],[1.88,1.68,.07,.08,.05],[1.95,1.62,.035,.04,.028]],
+    pel: 5, chest: 7, head: 10,
+    jaw: { hinge: [-.06, .06], pts: [[0,0,.1,.03,.05],[.15,-.02,.08,.025,.04],[.28,-.03,.05,.02,.025],[.34,-.03,.02,.01,.012]] },
+    eye: { p: [.1, .07, .1], r: .026, gaze: [.9, .05, .43], pupil: 'round', iris: '#5a3a1c' },
+    legs: [
+      { hind: true, at: [.2, 1.36, .1], j: [[0,0,0,.2],[0,-.55,.2,.1],[0,-1.03,-.14,.05],[0,-1.32,.04,.045],[0,-1.36,.27,.02]], sx: [.76,.8,.9,1.1,1.2],
+        thigh: [.03,-.18,.03, .17,.31,.23], calf: [0,-.7,.06, .07,.15,.09], toes: { n: 3, spread: .3, len: [.85,1,.85] } },
+      { arm: true, at: [.17, 1.26, 1.02], j: [[0,0,0,.05],[.02,-.17,-.06,.035],[.02,-.27,.05,.025],[.02,-.3,.14,.012]], sx: [1,1,1,1], fingers: 3 }],
+    col: { top: 0x6a6048, belly: 0xc4b896, mark: 0x3a3222, pat: 2, patF: 1.4, mouth: 0x6e3a30, crest: 0x9a8466, horn: 0x8a7a5e, beak: 0x2e281e, claw: 0x2a241c },
+    feat(P, c){ const { H, hb, F } = c;
+      P.ell(hb, [0, H[1] + .16, H[0] - .01], [.155, .15, .19], { k: .05, reg: F.crest }); // the dome
+      for (let k = 0; k < 7; k++){ const a = -1.3 + k * (2.6 / 6); P.ell(hb, [Math.sin(a) * .16, H[1] + .08 + Math.abs(Math.sin(a)) * .02, H[0] - .12 - Math.cos(a) * .07], [.03, .028, .03], { k: .012, reg: F.horn }); }
+      for (const z of [.2, .28]) P.ell(hb, [.04, H[1] + .07, H[0] + z], [.018, .02, .02], { k: .01, mirror: true, reg: F.horn }); // snout knobs
+      P.sub(hb, [.105, H[1] + .07, H[0] + .1], [.024, .022, .024], { k: .008, mirror: true });
+      P.cone(hb, hb, [0, H[1] - .03, H[0] + .3], [0, H[1] - .06, H[0] + .36], .035, .014, { k: .015, sx: .8, reg: F.beak });
+    } },
+  galli: {
+    size: 6, gait: 'biped', scaleF: 2.4,
+    // Gallimimus bullatus: ostrich-like; long S-neck, small toothless beaked head with big eyes, long arms, long shins and metatarsals
+    nodes: [[-3.2,1.62,.02,.02,.02],[-2.6,1.7,.05,.055,.055],[-2.0,1.78,.09,.1,.1],[-1.35,1.84,.14,.16,.16],[-.7,1.88,.19,.22,.24],
+      [-.05,1.9,.24,.26,.34],[.45,1.88,.26,.27,.38],[.85,1.92,.22,.24,.32],[1.15,2.12,.14,.15,.17],[1.36,2.42,.1,.105,.105],
+      [1.56,2.72,.085,.09,.08],[1.8,2.95,.075,.08,.065],[2.05,3.03,.09,.095,.055],[2.25,2.99,.07,.07,.045],[2.42,2.91,.048,.048,.03],[2.55,2.85,.026,.027,.017]],
+    pel: 5, chest: 7, head: 12,
+    jaw: { hinge: [-.03, .04], pts: [[0,0,.065,.02,.035],[.15,-.02,.05,.018,.025],[.32,-.04,.03,.012,.015],[.44,-.05,.012,.008,.008]] },
+    eye: { p: [.058, .04, .06], r: .03, gaze: [.95, .05, .3], pupil: 'round', iris: '#c08a2a' },
+    legs: [
+      { hind: true, at: [.2, 1.88, .05], j: [[0,0,0,.2],[0,-.6,.22,.1],[0,-1.22,-.18,.05],[0,-1.82,.05,.04],[0,-1.88,.3,.018]], sx: [.76,.8,.9,1.1,1.2],
+        thigh: [.03,-.2,.03, .16,.34,.24], calf: [0,-.85,.08, .07,.17,.09], toes: { n: 3, spread: .3, len: [.85,1,.85] } },
+      { arm: true, at: [.14, 1.82, .95], j: [[0,0,0,.05],[.02,-.3,-.12,.035],[.03,-.52,.1,.025],[.03,-.6,.32,.012]], sx: [1,1,1,1], fingers: 3 }],
+    col: { top: 0x8a7454, belly: 0xe0d2b0, mark: 0x4a3a28, pat: 3, patF: 2, mouth: 0x6e3a30, beak: 0x3a3024, claw: 0x2a241c },
+    feat(P, c){ const { H, hb, F } = c;
+      P.cone(hb, hb, [0, H[1] - .01, H[0] + .26], [0, H[1] - .06, H[0] + .5], .032, .01, { k: .015, sx: .8, reg: F.beak });
+      P.sub(hb, [.06, H[1] + .03, H[0] + .06], [.022, .022, .024], { k: .006, mirror: true });
+    } },
+  diplo: {
+    size: 24, gait: 'quad', trot: 0, scaleF: .8,
+    // Diplodocus carnegii: hips higher than the shoulders, very long near-horizontal neck, small long low head with nostrils high up,
+    // whip tail more than half the animal's length, held clear of the ground
+    nodes: [[-13,1.75,.14,.14,.14],[-11.4,2.0,.16,.17,.17],[-9.8,2.4,.17,.19,.19],[-8.2,2.85,.23,.27,.27],[-6.6,3.3,.32,.36,.38],[-5.0,3.7,.44,.48,.54],[-3.4,4.0,.62,.6,.74],[-1.8,4.15,.84,.66,.98],
+      [-.2,4.15,1.18,.76,1.45],[1.5,4.02,1.28,.72,1.6],[3.0,3.8,1.14,.66,1.45],
+      [4.3,3.78,.7,.56,.76],[5.5,4.0,.5,.46,.5],[6.7,4.28,.4,.37,.38],[7.9,4.55,.32,.3,.3],[9.0,4.78,.25,.25,.24],[9.9,4.92,.21,.21,.2],
+      [10.3,4.95,.2,.22,.15],[10.65,4.88,.17,.15,.1],[10.95,4.8,.14,.1,.07],[11.12,4.75,.08,.06,.05]],
+    pel: 8, chest: 10, head: 17, sleepNeck: 1.3, sleepHead: .4, sleepCurl: 1.2, sleepFoot: 1,
+    jaw: { hinge: [-.09, .12], pts: [[0,0,.17,.05,.08],[.3,-.04,.15,.04,.06],[.6,-.06,.12,.03,.04],[.78,-.06,.08,.02,.025]] },
+    eye: { p: [.17, .1, .12], r: .045, gaze: [.95, .1, .3], pupil: 'round', iris: '#4a3218' },
+    legs: [
+      { hind: true, at: [1.0, 3.2, -.2], j: [[0,0,0,.7],[0,-1.52,.25,.45],[0,-2.8,-.05,.33],[0,-3.12,.08,.36],[0,-3.2,.32,.17]], sx: [.82,.9,1,1.15,1.3],
+        thigh: [.05,-.45,.08, .56,.98,.76], toes: { n: 3, spread: .3, len: [.9,1,.9], hoof: true } },
+      { front: true, at: [.98, 2.72, 3.1], j: [[0,0,0,.56],[0,-1.28,-.18,.38],[0,-2.36,.04,.27],[0,-2.65,.08,.3],[0,-2.72,.28,.14]], sx: [.85,.9,1,1.15,1.3],
+        thigh: [.05,-.4,0, .46,.82,.56], toes: { n: 1, spread: 0, len: [1], hoof: true } }],
+    col: { top: 0x6e6a58, belly: 0xb0a88e, mark: 0x48443a, pat: 3, patF: .9, mouth: 0x6e3a30, claw: 0x2a241c },
+    feat(P, c){ const { H, hb } = c;
+      P.ell(hb, [0, H[1] + .2, H[0] + .05], [.18, .14, .2], { k: .1 }); // nasal dome over the eyes
+      P.sub(hb, [.06, H[1] + .3, H[0] + .05], [.04, .03, .06], { k: .02, mirror: true });
+      P.sub(hb, [.2, H[1] + .1, H[0] + .12], [.05, .045, .05], { k: .015, mirror: true });
+      P.ell(c.hb - 6, [0, 4.4, 4.2], [.75, .62, 1.0], { k: .4, rot: [-.2, 0, 0] }); // neck base
+    } },
+  theri: {
+    size: 9, gait: 'biped', scaleF: 1.8, clawF: 3.2, longArm: true,
+    // Therizinosaurus: semi-upright pot-bellied giant; long neck, small beaked head, short tail, four-toed broad feet,
+    // very long arms ending in metre-long scythe claws
+    nodes: [[-3.6,1.95,.03,.03,.03],[-3.0,2.1,.07,.075,.075],[-2.35,2.25,.12,.13,.13],[-1.65,2.4,.19,.21,.22],[-.9,2.55,.3,.34,.38],
+      [-.1,2.78,.52,.55,.78],[.55,3.22,.6,.52,.88],[1.05,3.7,.46,.4,.56],[1.35,4.15,.23,.22,.25],[1.6,4.58,.16,.16,.16],
+      [1.85,4.98,.15,.15,.14],[2.08,5.22,.13,.13,.11],[2.32,5.34,.12,.13,.075],[2.52,5.29,.09,.1,.055],[2.68,5.2,.06,.07,.035],[2.78,5.14,.03,.035,.02]],
+    pel: 5, chest: 7, head: 12,
+    jaw: { hinge: [-.05, .05], pts: [[0,0,.09,.03,.05],[.18,-.02,.075,.025,.035],[.34,-.04,.045,.018,.02],[.44,-.05,.018,.01,.01]] },
+    eye: { p: [.08, .05, .09], r: .03, gaze: [.92, .05, .4], pupil: 'round', iris: '#6a4a1c' },
+    legs: [
+      { hind: true, at: [.36, 2.62, .05], j: [[0,0,0,.36],[0,-.95,.36,.19],[0,-1.84,-.18,.1],[0,-2.52,.06,.1],[0,-2.62,.42,.045]], sx: [.76,.8,.9,1.1,1.2],
+        thigh: [.05,-.3,.05, .32,.58,.44], calf: [0,-1.2,.1, .15,.3,.17], toes: { n: 4, spread: .3, len: [.8,1,1,.8] } },
+      { arm: true, at: [.4, 3.35, 1.1], j: [[0,0,0,.15],[.08,-.85,-.3,.11],[.1,-1.55,.2,.075],[.1,-1.7,.55,.03]], sx: [1,1,1,1], fingers: 3 }],
+    col: { top: 0x5a4a3a, belly: 0xb09a7a, mark: 0x2e241a, pat: 0, patF: 1.4, mouth: 0x6e3a30, beak: 0x2a241c, claw: 0x2a2016 },
+    feat(P, c){ const { H, hb, F, owner } = c;
+      P.ell(owner(6), [0, 2.7, .65], [.56, .62, .74], { k: .35 }); // pot belly
+      P.cone(hb, hb, [0, H[1] - .02, H[0] + .3], [0, H[1] - .06, H[0] + .45], .045, .015, { k: .02, sx: .8, reg: F.beak });
+      P.sub(hb, [.08, H[1] + .05, H[0] + .09], [.024, .022, .024], { k: .008, mirror: true });
+    } },
 };
 
 /* ============================================================ textures ============================================================ */
@@ -377,7 +602,7 @@ const BUILT = {};
 function buildSpecies(key){
   if (BUILT[key]) return BUILT[key];
   const S = SPECIES[key]; S.key = key; const N = S.nodes, sz = S.size / 12;
-  S.hipH = S.legs[0].at[1]; S.quad = S.gait === 'quad'; S.carn = S.gait === 'biped';
+  S.hipH = S.legs.length ? S.legs[0].at[1] : (S.hipH0 ?? N[S.pel][1]); S.quad = S.gait === 'quad'; S.carn = S.gait === 'biped'; S.mode = S.mode || 'walk';
   // v7: lower jaw fills the upper jaw's outline so a closed mouth reads as a lip line, not a slit
   if (!S._jawAdj){ S._jawAdj = true; const wf = S.carn ? .93 : 1, uf = S.carn ? 2.1 : 1.4; S.jaw.pts = S.jaw.pts.map(p => [p[0], p[1], p[2] * wf, p[3] * uf, p[4]]); }
   S.halfW = Math.max(...N.map(n => n[2]));
@@ -396,13 +621,19 @@ function buildSpecies(key){
     const len = []; for (let i = 0; i < nb; i++) len.push(Math.hypot(J[i + 1][0] - J[i][0], J[i + 1][1] - J[i][1], J[i + 1][2] - J[i][2]));
     legInfo.push({ side: sd, L, J, bones, len, hind: !!L.hind, front: !!L.front, arm: !!L.arm });
   }
+  // v9: free bone chains (pterosaur wings, flippers): one bone per joint, posed by the fly / swim animators
+  const chainInfo = [];
+  for (const ch of S.chains || []) for (const sd of [1, -1]){ const parent = ch.parent === 'pel' ? S.pel : S.chest; const P = ch.pts.map(p => [sd * p[0], p[1], p[2], p[3]]); const bones = [];
+    for (let i = 0; i < P.length - 1; i++){ bones.push(rig.length); rig.push({ parent: i === 0 ? parent : rig.length - 1, abs: P[i].slice(0, 3) }); }
+    chainInfo.push({ side: sd, def: ch, P, bones, tag: ch.tag, front: !!ch.front }); }
   // ---------- spine sampling ----------
   const SPS = 3, samples = [];
   for (let i = 0; i < N.length - 1; i++) for (let s = 0; s < SPS; s++){ const f = s / SPS; const a = N[Math.max(0, i - 1)], b = N[i], c = N[i + 1], d = N[Math.min(N.length - 1, i + 2)];
     samples.push([0, 1, 2, 3, 4].map(k => k < 2 ? cr(a[k], b[k], c[k], d[k], f) : Math.max(.006, cr(a[k], b[k], c[k], d[k], f))).concat([i + f])); }
   samples.push([...N[N.length - 1], N.length - 1]);
   const spineAt = (z) => { for (let i = 0; i < samples.length - 1; i++){ const a = samples[i], b = samples[i + 1]; if (z >= a[0] && z <= b[0]){ const f = (z - a[0]) / (b[0] - a[0] || 1); return a.map((v, k) => lerp(v, b[k], f)); } } return samples[z < samples[0][0] ? 0 : samples.length - 1]; };
-  const atS = (s) => samples.find(q => q[5] >= s) || samples[samples.length - 1];
+  const atS = (s) => { const k = samples.findIndex(q => q[5] >= s); if (k < 0) return samples[samples.length - 1]; if (k === 0) return samples[0];
+    const A = samples[k - 1], B = samples[k], f = (s - A[5]) / ((B[5] - A[5]) || 1); return A.map((v, i) => v + (B[i] - v) * f); };
   const owner = (j) => j >= S.head ? hb : (j >= S.pel ? j : j + 1);
   const bodyW = (s) => { const j = Math.min(Math.floor(s), N.length - 2), f = s - j; const cur = owner(j);
     if (f < .5 && j > 0){ const o = owner(j - 1); return o === cur ? [[cur], [1]] : [[cur, o], [.5 + f, .5 - f]]; }
@@ -435,6 +666,9 @@ function buildSpecies(key){
         if (T.hoof) B.push(g, B.ellp(fb, [ball[0], ball[1] - ball[3] * .2, ball[2] + ball[3] * .25], [ball[3] * 1.2, ball[3] * .78, ball[3] * 1.25]), margin);
       }
     }
+    for (const ch of chainInfo){ const { P: CP, bones, side, def } = ch; const g = B.group('add', .05 * sz);
+      if (def.rigidFrom === undefined) for (let i = 0; i < CP.length - 1; i++) B.push(g, B.cone(bones[i], bones[i + 1] ?? bones[i], CP[i], CP[i + 1], CP[i][3], CP[i + 1][3]), margin);
+      for (const e of def.ell || []) B.push(g, B.ellp(bones[e[0]], [e[1][0] * side, e[1][1], e[1][2]], e[2], { rot: e[3] ? [e[3][0], e[3][1] * side, e[3][2] * side] : null }), margin); }
     const P = {
       ell: (bone, c, r, o = {}) => { for (const sd of (o.mirror ? [1, -1] : [1])){ const g = B.group(o.sub ? 'sub' : 'add', o.k ?? .05 * sz); B.push(g, B.ellp(bone, [c[0] * sd, c[1], c[2]], r, { reg: o.reg, rot: o.rot ? [o.rot[0], o.rot[1] * sd, o.rot[2] * sd] : null }), margin); } },
       sub: (bone, c, r, o = {}) => P.ell(bone, c, r, Object.assign({}, o, { sub: true })),
@@ -443,16 +677,16 @@ function buildSpecies(key){
       frill: (bone, base, w, h, th, tilt, reg) => { const g = B.group('add', .12 * sz);
         B.push(g, B.ellp(bone, [base[0], base[1] + h * .45 * Math.cos(tilt), base[2] + h * .45 * Math.sin(tilt)], [w, h * .55, th], { reg, rot: [tilt, 0, 0] }), margin); },
     };
-    S.feat(P, { H, hb, F, sz });
+    S.feat(P, { H, hb, F, sz, atS, owner, samples });
     if (S.osteo){ const g = B.group('add', .018 * sz); const r = mulberry(5);
       // v8: osteoderms in transverse bands (as preserved in Ankylosaurus/Euoplocephalus), largest over the hips, not a random scatter
       let row = 0; for (let s = 1.5; s < S.head - .25; s += .36, row++){ const sp = atS(s); const big = s > S.pel - 1 && s < S.chest + 1 ? 1.25 : .85; const nA = s < S.pel - 1.5 || s > S.chest + .6 ? 4 : 6;
         for (let q = 0; q < nA; q++){ const a = ((q + .5) / nA - .5) * 2.5 + (row % 2 ? .12 : -.12) + (r() - .5) * .08; const ca = Math.cos(a), sa = Math.sin(a);
           const rr = (.1 + r() * .025) * big * (1 - Math.abs(a) * .18);
           B.push(g, B.ellp(owner(Math.floor(s)), [sa * sp[2] * 1.0, sp[1] + ca * sp[3] * 1.0, sp[0]], [rr, rr * .55, rr * 1.25], { reg: F.osteo }), margin); } }
-      const t0 = samples[1], cb = owner(0);
+      const t0 = samples[1], cb = owner(0); if (!S.noClub){
       B.push(g, B.ellp(cb, [.24, t0[1], t0[0]], [.33, .19, .38], { reg: F.osteo }), margin); B.push(g, B.ellp(cb, [-.24, t0[1], t0[0]], [.33, .19, .38], { reg: F.osteo }), margin);
-      B.push(g, B.ellp(cb, [0, t0[1] + .02, t0[0] + .1], [.24, .17, .32], { reg: F.osteo }), margin); }
+      B.push(g, B.ellp(cb, [0, t0[1] + .02, t0[0] + .1], [.24, .17, .32], { reg: F.osteo }), margin); } }
     return B;
   };
   const makeJaw = (cell) => { const B = new Builder(); const g = B.group('add', 0); g.spine = true;
@@ -504,12 +738,12 @@ function buildSpecies(key){
   const hiB = make(cellHi), loB = make(cellLo);
   const bodyHi = meshFrom(hiB, surfaceNets(hiB.groups, cellHi)), bodyLo = meshFrom(loB, surfaceNets(loB.groups, cellLo));
   const jB = makeJaw(cellHi * .8), jawHi = meshFrom(jB, surfaceNets(jB.groups, cellHi * .8), true); const jBl = makeJaw(cellLo), jawLo = meshFrom(jBl, surfaceNets(jBl.groups, cellLo), true);
-  const ex = buildExtras(S, { N, H, hb, jawBone, hinge, legInfo, spineAt, owner, samples, atS, sz });
+  const ex = buildExtras(S, { N, H, hb, jawBone, hinge, legInfo, chainInfo, spineAt, owner, samples, atS, sz });
   const eyes = buildEyes(S, { H, eyeBones });
   const hi = mergeGeometries([mergeGeometries([bodyHi, jawHi, ...ex.hi], false), eyes], true);
   const lo = mergeGeometries([mergeGeometries([bodyLo, jawLo, ...ex.lo], false), eyes], true);
   for (const g of [hi, lo]){ g.computeBoundingSphere(); g.boundingSphere.radius *= 1.25; }
-  const out = { S, rig, legInfo, jawBone, eyeBones, hi, lo, buildMs: performance.now() - t0, tris: { hi: hi.index.count / 3, lo: lo.index.count / 3 }, counts: { body: bodyHi.attributes.position.count, jaw: jawHi.attributes.position.count } };
+  const out = { S, rig, legInfo, chainInfo, jawBone, eyeBones, hi, lo, buildMs: performance.now() - t0, tris: { hi: hi.index.count / 3, lo: lo.index.count / 3 }, counts: { body: bodyHi.attributes.position.count, jaw: jawHi.attributes.position.count } };
   BUILT[key] = out; return out;
 }
 
@@ -532,7 +766,7 @@ const _m4 = new THREE.Matrix4(), _vy = new THREE.Vector3(), _vz = new THREE.Vect
 function place(g, base, dir, hint = [0, 0, 1]){ _vy.set(dir[0], dir[1], dir[2]).normalize(); _vz.set(hint[0], hint[1], hint[2]); _vz.addScaledVector(_vy, -_vz.dot(_vy)); if (_vz.lengthSq() < 1e-6) _vz.set(1, 0, 0); _vz.normalize(); _vx.crossVectors(_vy, _vz);
   _m4.makeBasis(_vx, _vy, _vz).setPosition(base[0], base[1], base[2]); g.applyMatrix4(_m4); return g; }
 function buildExtras(S, c){
-  const { N, H, hb, jawBone, hinge, legInfo, spineAt, owner, samples, atS, sz } = c; const hi = [], lo = [];
+  const { N, H, hb, jawBone, hinge, legInfo, chainInfo, spineAt, owner, samples, atS, sz } = c; const hi = [], lo = [];
   const claw = new THREE.Color(S.col.claw || 0x221d17); const both = (g) => { hi.push(g); lo.push(g); };
   const ivory = new THREE.Color(0xeee6cf), stain = new THREE.Color(0xb09a70);
   if (S.teeth){ const [nu, nl] = S.teeth; const tip = N[N.length - 1][0]; const z0 = hinge[2] + .12 * sz, z1 = tip - .025 * S.size / 4;
@@ -546,7 +780,7 @@ function buildExtras(S, c){
         hi.push(rigid(place(curvedCone(L, L * .2, -.2, 5, 3), [sd * w * .6, hinge[1] + dy + up * .75 - L * .35, hinge[2] + dz], [0, 1, 0], [0, 0, 1]), 0xe8dfc6, jawBone, .3)); } } }
   for (const li of legInfo){ if (!li.tips.length) continue; const fb = li.bones[li.bones.length - 1]; const ball = li.J[li.J.length - 2]; const hoof = li.L.toes && li.L.toes.hoof;
     for (const e of li.tips){ const base = li.arm ? li.J[2] : ball; const d = [e[0] - base[0], e[1] - base[1], e[2] - base[2]]; const dl = Math.hypot(...d);
-      const L = li.arm ? dl * .42 : hoof ? Math.max(ball[3] * .5, dl * .22) : dl * .3; const r = li.arm ? L * .2 : hoof ? L * .5 : L * .24;
+      const L = li.arm ? dl * .42 * (S.clawF || 1) : hoof ? Math.max(ball[3] * .5, dl * .22) : dl * .3; const r = li.arm ? L * .2 / Math.sqrt(S.clawF || 1) : hoof ? L * .5 : L * .24;
       const g = curvedCone(L, r, hoof ? -.15 : -.5, 6, 3); place(g, [e[0] - d[0] / dl * L * .3, e[1] - (hoof ? r * .5 : L * .05), e[2] - d[2] / dl * L * .3], [d[0] / dl, hoof ? -.35 : -.12, d[2] / dl], [0, 1, 0]);
       const cg = rigid(g, claw, li.arm ? li.bones[2] : fb, .35); hi.push(cg); if (S.size >= 7) lo.push(cg); } // small species: far mesh toes are too thin to hold claws
     if (li.L.sickle){ const g = curvedCone(.1, .018, -1.0, 6, 5); place(g, [ball[0] - li.side * .012, ball[1] + .03, ball[2] + .01], [0, .7, .7], [0, .3, 1]); hi.push(rigid(g, claw, fb, .3)); } }
@@ -596,11 +830,56 @@ function buildExtras(S, c){
     g.computeVertexNormals(); const end = curve.getPointAt(1), tan = curve.getTangentAt(1); const cap = new THREE.SphereGeometry(.078, 10, 6); cap.scale(.72, 1, .9); cap.translate(end.x, end.y, end.z);
     const c0 = new THREE.Color(S.col.crest), c1 = new THREE.Color(S.col.crest).multiplyScalar(.7); const cf = (v) => c0.clone().lerp(c1, clamp((H[0] - v.z) / 1.2, 0, 1));
     both(rigid(g, 0xffffff, hb, .6, cf)); both(rigid(cap, 0xffffff, hb, .6, cf)); }
+  // v9 wings: the arm bones and the long fourth finger as rigid cones (thinner than a mesh cell), plus a skinned double-sided membrane
+  for (const ch of chainInfo || []) if (ch.tag === 'wing'){ const P = ch.P, bc = new THREE.Color(S.col.bone || S.col.top);
+    for (let i = 0; i < P.length - 1; i++){ const a = P[i], b = P[i + 1], d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L = Math.hypot(...d);
+      const g = new THREE.CylinderGeometry(b[3], a[3], L, 7, 1); g.translate(0, L / 2, 0); place(g, a, d, [0, 1, 0]); const r = rigid(g, bc, ch.bones[i], .55); hi.push(r); lo.push(r);
+      const k = new THREE.SphereGeometry(a[3] * 1.15, 8, 6); k.translate(a[0], a[1], a[2]); const rk = rigid(k, bc, ch.bones[i], .55); hi.push(rk); lo.push(rk); }
+    { const w = P[2], g = curvedCone(w[3] * 3, w[3] * .6, -.5, 5, 2); place(g, [w[0], w[1], w[2]], [0, .2, 1], [0, 1, 0]); hi.push(rigid(g, S.col.claw || 0x221d17, ch.bones[2], .35)); } // three small clawed fingers at the wrist
+    hi.push(wingMembrane(S, ch, legInfo)); lo.push(hi[hi.length - 1]); }
+  for (const sd of S.sails || []) both(spineSail(S, sd, atS, owner));
+  if (S.key === 'ptera'){ const cc = new THREE.Color(S.col.crest), cb = new THREE.Color(S.col.beak);
+    const sh = new THREE.Shape(); sh.moveTo(.12, .02); sh.bezierCurveTo(.0, .1, -.25, .2, -.62, .3); sh.lineTo(-.7, .31); sh.bezierCurveTo(-.45, .17, -.2, .05, -.02, -.02); sh.lineTo(.12, .02);
+    const g = new THREE.ExtrudeGeometry(sh, { depth: .018, bevelEnabled: true, bevelThickness: .006, bevelSize: .006, bevelSegments: 1, curveSegments: 10 }); g.translate(0, 0, -.009); g.rotateY(-Math.PI / 2); g.translate(0, H[1] + .055, H[0] + .02);
+    both(rigid(g, 0xffffff, hb, .5, (v) => cb.clone().lerp(cc, clamp((H[0] - v.z) / .45, 0, 1)))); }
   if (S.quills){ const qc = new THREE.Color(0x2a2016), qt = new THREE.Color(0x8a7454);
     for (let s = S.pel - 2.6; s < S.head + .2; s += .12){ const sp = atS(s); const L = (.03 + .028 * ss(S.pel - 2.6, S.chest, s) * (1 - ss(S.head - .6, S.head + .2, s))) * (1 + Math.sin(s * 9) * .15);
       const g = curvedCone(L, .004, -.5, 4, 2); place(g, [0, sp[1] + sp[3] * .92, sp[0]], [0, .55, -.8], [0, 1, 0]); hi.push(rigid(g, 0xffffff, owner(Math.floor(s)), .6, (v) => qc.clone().lerp(qt, clamp((v.y - sp[1] - sp[3]) / L, 0, 1)))); } }
   return { hi, lo };
 }
+// a skin membrane from the arm and wing finger back to the body and hind limb (brachiopatagium), with its own skin weights
+function wingMembrane(S, ch, legInfo){ const P = ch.P, sd = ch.side, W = S.wing; const seg = [];
+  let tot = 0; for (let i = 0; i < P.length - 1; i++){ const L = Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1], P[i + 1][2] - P[i][2]); seg.push([tot, L]); tot += L; }
+  const leg = legInfo.find(l => l.hind && l.side === sd); const legBone = leg ? leg.bones[1] : S.pel;
+  const NS = 26, NV = 5, pos = [], si = [], sw = [], ix = [], v3 = new THREE.Vector3();
+  const lead = (u) => { const d = u * tot; let k = 0; while (k < seg.length - 1 && d > seg[k][0] + seg[k][1]) k++; const f = clamp((d - seg[k][0]) / seg[k][1], 0, 1); const a = P[k], b = P[k + 1]; return { p: [lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(a[2], b[2], f)], k, f }; };
+  for (let i = 0; i <= NS; i++){ const u = Math.pow(i / NS, 1.15); const L = lead(u); const chord = W.chord * Math.pow(1 - u, .75) * (1 - .25 * Math.sin(u * Math.PI));
+    for (let j = 0; j <= NV; j++){ const v = j / NV; const x = L.p[0] * (1 - v * .06 * (1 - u)), y = L.p[1] - W.droop * Math.sin(v * Math.PI) - v * .02 * (1 - u), z = L.p[2] - chord * v; pos.push(x, y, z);
+      const bA = ch.bones[L.k], bB = ch.bones[Math.min(L.k + 1, ch.bones.length - 1)]; const fB = L.k < ch.bones.length - 1 ? ss(.7, 1, L.f) * .5 : 0;
+      const wBody = v * Math.pow(1 - u, 3) * .3, wLeg = wBody * .3, wB = wBody - wLeg, wArm = 1 - wBody; // mostly on the arm chain: the root chord lies on the flap axis, and the sheet furls with the arm
+      si.push(bA, bB, S.pel, legBone); sw.push(wArm * (1 - fB), wArm * fB, wB, wLeg); } }
+  for (let i = 0; i < NS; i++) for (let j = 0; j < NV; j++){ const a = i * (NV + 1) + j, b = a + NV + 1; if (sd > 0) ix.push(a, a + 1, b, a + 1, b + 1, b); else ix.push(a, b, a + 1, a + 1, b, b + 1); }
+  const n = pos.length / 3; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(ix); g.computeVertexNormals();
+  // second sheet facing down (belly colour) so the membrane reads from above and below with normal back-face culling
+  const nr = g.attributes.normal; const P2 = [], N2 = [], I2 = [], M2 = [], SI = [], SW = [];
+  for (let side = 0; side < 2; side++) for (let k = 0; k < n; k++){ const f = side ? -1 : 1; P2.push(pos[k * 3], pos[k * 3 + 1] - side * .002, pos[k * 3 + 2]); N2.push(nr.getX(k) * f, nr.getY(k) * f, nr.getZ(k) * f); M2.push(1, 0, .75, side ? .55 : .06); for (let q = 0; q < 4; q++){ SI.push(si[k * 4 + q]); SW.push(sw[k * 4 + q]); } }
+  for (let t = 0; t < ix.length; t += 3){ I2.push(ix[t], ix[t + 1], ix[t + 2]); I2.push(ix[t] + n, ix[t + 2] + n, ix[t + 1] + n); }
+  const out = new THREE.BufferGeometry(); out.setAttribute('position', new THREE.Float32BufferAttribute(P2, 3)); out.setAttribute('normal', new THREE.Float32BufferAttribute(N2, 3)); out.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 4), 2));
+  out.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 6).fill(1), 3)); out.setAttribute('aMask', new THREE.Float32BufferAttribute(M2, 4)); out.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(SI, 4)); out.setAttribute('skinWeight', new THREE.Float32BufferAttribute(SW, 4));
+  out.setIndex(I2); return out.toNonIndexed ? (() => { const o = out.toNonIndexed(); const ii = new Uint32Array(o.attributes.position.count); for (let i = 0; i < ii.length; i++) ii[i] = i; o.setIndex(new THREE.BufferAttribute(ii, 1)); return o; })() : out; }
+// a fin that follows the spine (Spinosaurus sail, mosasaur fluke): skinned to the nearest spine bones so it bends with the body
+function spineSail(S, D, atS, owner){ const NS = 30, pos = [], nrm = [], si = [], sw = [], ix = [], msk = [];
+  const hAt = (s) => { const h = D.h; let k = 0; while (k < h.length - 2 && h[k + 1][0] < s) k++; const f = clamp((s - h[k][0]) / (h[k + 1][0] - h[k][0]), 0, 1); return lerp(h[k][1], h[k + 1][1], ss(0, 1, f)); };
+  for (let side = 0; side < 2; side++){ const base = pos.length / 3; const f = side ? -1 : 1;
+    for (let i = 0; i <= NS; i++){ const s = lerp(D.s0, D.s1, i / NS); const sp = atS(s); const h = hAt(s); const b0 = owner(Math.floor(s)), b1 = owner(Math.min(Math.floor(s) + 1, S.head)); const fr = s - Math.floor(s);
+      for (const t of [0, 1]){ const y = sp[1] + (h >= 0 ? sp[3] * .8 + t * h : -sp[4] * .8 + t * h); pos.push(f * D.th * (1 - t * .6), y, sp[0]); nrm.push(f, 0, 0); si.push(b0, b1, 0, 0); sw.push(1 - fr, fr, 0, 0); msk.push(1, 0, .7, t ? 0 : .1); } }
+    for (let i = 0; i < NS; i++){ const a = base + i * 2, b = a + 2; if (!side) ix.push(a, a + 1, b, a + 1, b + 1, b); else ix.push(a, b, a + 1, a + 1, b, b + 1); } }
+  // top edge cap
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); g.setIndex(ix);
+  const o = g.toNonIndexed(); const n = o.attributes.position.count; const map = (arr, w) => { const out = []; for (let t = 0; t < ix.length; t++) for (let q = 0; q < w; q++) out.push(arr[ix[t] * w + q]); return out; };
+  o.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2)); o.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3)); o.setAttribute('aMask', new THREE.Float32BufferAttribute(map(msk, 4), 4));
+  o.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(map(si, 4), 4)); o.setAttribute('skinWeight', new THREE.Float32BufferAttribute(map(sw, 4), 4)); o.computeVertexNormals();
+  const ii = new Uint32Array(n); for (let i = 0; i < n; i++) ii[i] = i; o.setIndex(new THREE.BufferAttribute(ii, 1)); return o; }
 function buildEyes(S, c){ const { H, eyeBones } = c; const out = [];
   [1, -1].forEach((sd, i) => { const g = new THREE.SphereGeometry(S.eye.r, 16, 12); g.rotateY(Math.PI / 2); // iris (u=.25 -> -X after default) moved to +Z
     const gz = S.eye.gaze; g.rotateX(-gz[1]); g.rotateY(Math.atan2(sd * gz[0], gz[2])); g.translate(sd * S.eye.p[0], H[1] + S.eye.p[1], H[0] + S.eye.p[2]);
@@ -687,6 +966,7 @@ export class Dino {
     const jit = (hex, h, l) => { const c = new THREE.Color(hex); c.offsetHSL((rnd() - .5) * h, (rnd() - .5) * .06, (rnd() - .5) * l); return c; };
     this.U = { uSkin: { value: skinTexture() }, uTop: { value: jit(S.col.top, .04, .07) }, uBelly: { value: jit(S.col.belly, .03, .06) }, uMark: { value: jit(S.col.mark, .03, .05) },
       uPat: { value: new THREE.Vector4(S.col.pat, S.col.patF * (.9 + rnd() * .2), rnd() * 40, rnd() * 40) }, uScale: { value: S.scaleF }, uBump: { value: .14 / (26 * S.scaleF) }, uSize: { value: S.size }, uBreath: { value: 0 } };
+    this._base = { top: this.U.uTop.value.clone(), belly: this.U.uBelly.value.clone(), mark: this.U.uMark.value.clone(), pat: S.col.pat, j: [(rnd() - .5) * .04, (rnd() - .5) * .06] }; this.scheme = 'natural'; this.pattern = -1;
     this.matHi = makeSkin(S, this.U, true); this.matLo = makeSkin(S, this.U, false); const eye = eyeMaterial(S);
     this.meshHi = new THREE.SkinnedMesh(B.hi, [this.matHi, eye]); this.meshLo = new THREE.SkinnedMesh(B.lo, [this.matLo, eye]); this._loMats = [this.matLo, eye]; this._invMats = [INVIS, INVIS];
     const rootBone = bones[S.pel]; this.root.add(rootBone); this.root.add(this.meshHi); this.root.add(this.meshLo); this.root.updateMatrixWorld(true);
@@ -701,11 +981,68 @@ export class Dino {
       const ank = J[2], ball = J[3]; const mt = Math.hypot(ank[1] - ball[1], ank[2] - ball[2]); const alpha0 = Math.atan2(-(ank[2] - ball[2]), ank[1] - ball[1]);
       const toe = new THREE.Vector3(J[4][0] - ball[0], J[4][1] - ball[1], J[4][2] - ball[2]);
       return { li, n, restDir, alpha0, mt, toe, ball: new THREE.Vector3(ball[0], ball[1], ball[2]), off: li.side > 0 ? 0 : .5, hipH: J[0][1], knee: li.front ? -1 : 1 }; });
-    this.maxStance = .9 * Math.min(...this.legs.filter(l => !l.li.arm).map(l => l.hipH));
+    this.maxStance = .9 * Math.min(1e3, ...this.legs.filter(l => !l.li.arm).map(l => l.hipH));
+    this.chains = (B.chainInfo || []).map(c => ({ tag: c.tag, side: c.side, bones: c.bones, front: c.front })); this.air = 0; this.airK = 0; this.flap = 1; this.fph = rnd() * TAU; this.sph = rnd() * TAU; this.pitch = 0; this.swimSp = 0; this.wade = 0;
     { let lo = Infinity; for (let i = Math.max(0, S.pel - 1); i <= S.chest; i++) lo = Math.min(lo, S.nodes[i][1] - S.nodes[i][4]); this.sleepDrop = Math.max(0, lo - .025 * S.size); }
     this.sleepSide = rnd() < .5 ? -1 : 1; this.phase = rnd() * TAU; this.cyc = rnd(); this.t = rnd() * 10; this.action = null; this.actT = 0; this.actDur = 1; this.sleep = 0;
     this.mv = 0; this.run = 0; this.lookY = 0; this.lookX = 0; this.lookTarget = null; this._lookGoal = [0, 0]; this._lookT = 0; this.blinkT = 1 + rnd() * 3; this.blink = 0; this.exert = 0;
   }
+  // v9 colour schemes: a uniform swap on this animal's own materials - no new materials, programs or draw calls
+  setScheme(id = 'natural', pattern = -1){ const sc = SCHEMES.find(x => x.id === id) || SCHEMES[0], b = this._base, U = this.U; this.scheme = sc.id; this.pattern = pattern;
+    if (sc.id === 'natural'){ U.uTop.value.copy(b.top); U.uBelly.value.copy(b.belly); U.uMark.value.copy(b.mark); }
+    else { for (const [k, u] of [['top', U.uTop], ['belly', U.uBelly], ['mark', U.uMark]]){ u.value.setHex(sc[k]); u.value.offsetHSL(b.j[0], 0, b.j[1]); } }
+    const pt = pattern >= 0 && pattern < 4 ? pattern : sc.pat ?? b.pat; U.uPat.value.x = pt;
+    if (pattern === 4) U.uMark.value.copy(U.uTop.value).multiplyScalar(.82); // plain: markings fade into the base colour
+    if (this.matHi.sheenColor) this.matHi.sheenColor.copy(U.uBelly.value).multiplyScalar(.45); }
+  _reset(){ const bones = this.bones; for (let i = 0; i < bones.length; i++){ bones[i].quaternion.identity(); bones[i].position.copy(this.rest[i]); bones[i].scale.set(1, 1, 1); } }
+  _headActs(dt){ const act = this.action, at = clamp(this.actT / this.actDur, 0, 1); let jaw = 0, up = 0, down = 0, lunge = 0;
+    if (act === 'roar'){ const e = Math.sin(at * Math.PI); up = e * .6; jaw = ss(0, .25, at) * (1 - ss(.8, 1, at)); }
+    if (act === 'bite'){ const e = Math.sin(at * Math.PI); lunge = e; jaw = at < .55 ? Math.sin(at / .55 * Math.PI / 2) : Math.max(0, 1 - (at - .55) * 6); down = e * .2; }
+    if (act === 'eat' || act === 'drink'){ const e = ss(0, .15, at) * (1 - ss(.85, 1, at)); down = e * .8; jaw = (Math.sin(this.t * 8) * .5 + .5) * .3 * e; }
+    return { jaw, up, down, lunge }; }
+  _eyes(dt){ this.blinkT -= dt; if (this.blinkT < 0){ this.blink += dt / .08; if (this.blink >= 2){ this.blink = 0; this.blinkT = 2 + this.rnd() * 5; } }
+    const lid = Math.max(clamp(this.sleep, 0, 1), this.blink < 1 ? this.blink : 2 - this.blink, 0); for (const eb of this.B.eyeBones) this.bones[eb].scale.set(1, Math.max(.06, 1 - lid * .94), 1); }
+  // v9 pterosaur: air (0 perched .. 1 flying) is set by the game; flap (0 glide .. 1 flapping); folded wings tuck the long finger back along the body
+  _fly(dt, speed, turn){ const S = this.S, bones = this.bones; this.t += dt; const t = this.t; this._lod(); if (this.action){ this.actT += dt; if (this.actT > this.actDur) this.action = null; }
+    this._reset(); this.airK = damp(this.airK, this.air, 2.2, dt); const a = this.airK, f = 1 - a; this.flapK = damp(this.flapK || 0, this.flap, 3, dt);
+    this.fph += dt * TAU * lerp(1.6, 2.4, this.flapK) * (a > .05 ? 1 : 0); const s = Math.sin(this.fph), fl = this.flapK * a;
+    const H = this.headActs = this._headActs(dt); const pel = bones[S.pel];
+    const pitch = f * -.62 + a * (this.pitch || 0); const roll = a * clamp(-turn * .55, -.7, .7);
+    pel.position.y += a * -s * .035 * fl * S.size / 3 + f * Math.sin(t * 1.3) * .004; _eu.set(pitch, 0, roll); pel.quaternion.setFromEuler(_eu);
+    for (let i = 0; i < S.pel; i++) bones[i].rotation.set(f * .18 / S.pel + Math.sin(t * 2 + i) * .01, Math.sin(t * .7 + i * .4) * .03 * f, 0);
+    const nn = S.head - S.chest, look = (this.rnd ? 0 : 0);
+    this._lookT -= dt; if (this._lookT < 0){ this._lookT = 1.5 + this.rnd() * 4; this._lookGoal = [(this.rnd() - .5) * 1.4 * f, (this.rnd() - .5) * .3]; }
+    this.lookY = damp(this.lookY, this._lookGoal[0], 3, dt); this.lookX = damp(this.lookX, this._lookGoal[1], 3, dt);
+    for (let i = S.pel + 1; i <= S.head; i++){ const b = bones[i]; if (i <= S.chest){ b.rotation.set(0, 0, 0); continue; }
+      const sh = 1 / nn; b.rotation.set(sh * (f * (.62 + .25) - a * pitch * .8 + a * .12 + H.down * 1.2 - H.up + this.lookX) + (i === S.chest + 1 ? -f * .9 + a * .45 : 0) + (i === S.head ? f * .35 - a * .05 : 0), sh * (this.lookY + turn * .2), sh * -roll * .5); }
+    bones[this.B.jawBone].rotation.x = H.jaw * .45;
+    // wings
+    for (const c of this.chains){ if (c.tag !== 'wing') continue; const sd = c.side, b = c.bones;
+      const up = (s * .62 + .1) * fl + (1 - this.flapK) * a * .06; const twist = Math.cos(this.fph) * .18 * fl;
+      // folded pose: humerus back and down along the flank, forearm forward, the long finger folded back over the hips (pterosaurs walked on the folded wing knuckles)
+      bones[b[0]].rotation.set(-f * .1 + twist * .4, sd * f * 1.05, sd * (up - f * 1.0), 'YZX');
+      bones[b[1]].rotation.set(0, -sd * f * 2.6 + sd * Math.max(0, -s) * .12 * fl, sd * f * .35);
+      bones[b[2]].rotation.set(0, sd * f * 1.2, -sd * f * .9);
+      bones[b[3]].rotation.set(twist * .5, sd * f * 2.9 - sd * .06 * a, sd * (f * .35 + s * .12 * fl)); bones[b[3]].scale.setScalar(lerp(1, .38, f)); bones[b[0]].scale.setScalar(lerp(1, .85, f)); }
+    // legs: trail behind in flight; under the body when perched
+    for (const Lg of this.legs){ const bs = Lg.li.bones; if (Lg.li.arm) continue; bones[bs[0]].rotation.set(a * 1.45 - f * pitch, 0, Lg.li.side * a * .12); bones[bs[1]].rotation.set(-a * .25, 0, 0); bones[bs[2]].rotation.set(a * .5, 0, 0); }
+    this._eyes(dt); this.U.uBreath.value = Math.sin(t * 2.4) * S.size * .002; }
+  // v9 swimmer: tail undulation (mosasaur) or four-flipper 'underwater flight' (plesiosaur); pitch / roll from the game
+  _swim(dt, speed, turn){ const S = this.S, bones = this.bones; this.t += dt; const t = this.t; this._lod(); if (this.action){ this.actT += dt; if (this.actT > this.actDur) this.action = null; }
+    this._reset(); const sp = clamp(Math.abs(speed) / 4, .15, 1.6); this.sph += dt * TAU * (.35 + sp * .35); const ph = this.sph; const H = this._headActs(dt); const pel = bones[S.pel];
+    _eu.set(-(this.pitch || 0), 0, clamp(-turn * .35, -.5, .5)); pel.quaternion.setFromEuler(_eu);
+    const amp = S.swimTail * (.6 + sp * .5);
+    for (let i = 0; i < S.pel; i++){ const k = (S.pel - i) / S.pel; bones[i].rotation.set(0, Math.sin(ph - (S.pel - i) * .55) * amp * (.3 + k) - turn * .12 * k, 0); }
+    const nn = S.head - S.chest;
+    for (let i = S.chest + 1; i <= S.head; i++){ const b = bones[i]; const kk = (i - S.chest) / nn;
+      const sway = (S.neckSway ? Math.sin(t * .45 + i * .35) * .05 : -Math.sin(ph) * amp * .25 / nn) + turn * .3 / nn;
+      b.rotation.set((S.neckSway ? Math.sin(t * .3 + i * .2) * .02 + .012 : 0) + (H.down - H.up * .8) / nn + (i === S.head ? -H.lunge * .2 : 0), sway, 0); }
+    bones[S.chest].rotation.set(0, Math.sin(ph - .4) * amp * .25, 0);
+    bones[this.B.jawBone].rotation.x = H.jaw * .5;
+    for (const c of this.chains){ if (c.tag !== 'fin') continue; const sd = c.side, b = c.bones; const off = c.front ? 0 : Math.PI * .5;
+      const st = Math.sin(ph * (S.finStroke > .3 ? 1 : 1.0) + off) * S.finStroke * (S.finStroke > .3 ? 1 : (.4 + sp * .4)); const tw = Math.cos(ph + off) * .35 * (S.finStroke > .3 ? 1 : .3);
+      bones[b[0]].rotation.set(tw, sd * .1, sd * st); if (b[1] !== undefined) bones[b[1]].rotation.set(tw * .4, 0, sd * st * .35); }
+    this._eyes(dt); this.U.uBreath.value = 0; }
   get tris(){ return this.near ? this.B.tris.hi : this.B.tris.lo; }
   _setNear(n){ if (n === this.near) return; this.near = n; this.meshHi.visible = n; this.meshLo.material = n ? this._invMats : this._loMats; }
   _lod(){ if (this.forceLOD){ this._setNear(this.forceLOD !== 'lo'); return; } if (!CAM) return;
@@ -713,6 +1050,8 @@ export class Dino {
   setAction(a, dur){ this.action = a; this.actT = 0; this.actDur = dur || 1; }
   setLook(v){ this.lookTarget = v; }
   animate(dt, speed, turn){
+    if (this.S.mode === 'fly') return this._fly(dt, speed, turn || 0);
+    if (this.S.mode === 'swim') return this._swim(dt, speed, turn || 0);
     const S = this.S, bones = this.bones; turn = turn || 0; this.t += dt; const t = this.t; this._lod();
     if (this.action){ this.actT += dt; if (this.actT > this.actDur) this.action = null; }
     const act = this.action, at = clamp(this.actT / this.actDur, 0, 1); const sl = clamp(this.sleep, 0, 1);
@@ -740,8 +1079,11 @@ export class Dino {
       const sway = -Math.sin(TAU * c - (S.pel - i) * .45) * .06 * mv * (.4 + k) + Math.sin(t * .55 + i * .5) * .035 * (1 - mv) * (1 - sl);
       b.rotation.set(run * (biped ? -.02 : .012) * mv - sl * slTail + breath * .002 + (biped ? Math.cos(TAU * 2 * c - (S.pel - i) * .5) * .018 * run * mv : 0), sway - turn * .1 * (.3 + k) - pelYaw * .4 + sl * sSide * .1 * (.4 + k), 0); }
     // head & neck
-    let headDown = 0, headUp = 0, jaw = 0, lunge = 0, tremor = 0;
+    let headDown = 0, headUp = 0, jaw = 0, lunge = 0, tremor = 0, lean_extra = 0;
     if (act === 'eat'){ const e = ss(0, .15, at) * (1 - ss(.85, 1, at)); headDown = e; if (biped){ jaw = (Math.sin(t * 7) * .5 + .5) * .45 * e; lunge = Math.max(0, Math.sin(t * 3.5)) * .3 * e; } else jaw = (Math.sin(t * 9) * .5 + .5) * .22 * e; }
+    let splay = 0; this._splay = this._splay || 0;
+    if (act === 'drink'){ const e = ss(0, .2, at) * (1 - ss(.85, 1, at)); const big = S.size >= 15; headDown = e * (big ? 1.45 : 1.15); jaw = (Math.sin(t * 5) * .5 + .5) * .08 * e; if (big){ splay = e; lean_extra = e * .05; } }
+    this._splay = damp(this._splay, splay, 3, dt);
     if (act === 'roar'){ const e = Math.sin(at * Math.PI); headUp = e * .85; jaw = ss(0, .25, at) * (1 - ss(.8, 1, at)); tremor = e; }
     if (act === 'bite'){ const e = Math.sin(at * Math.PI); lunge = e; jaw = at < .55 ? Math.sin(at / .55 * Math.PI / 2) : Math.max(0, 1 - (at - .55) * 6); headDown = e * .4; }
     this._lookT -= dt; let gy = this._lookGoal[0], gx = this._lookGoal[1];
@@ -753,10 +1095,10 @@ export class Dino {
     for (let i = S.pel + 1; i <= S.head; i++){ const b = bones[i];
       if (i <= S.chest){ b.rotation.set(breath * .004 + lunge * .02, -pelYaw * .6, -roll * .5); continue; }
       const share = 1 / nn, kk = i - S.chest - 1, wd = 2 * (nn - kk) / (nn * (nn + 1)); // sleeping necks bend most at the base
-      const rx = share * (headDown * (S.key === 'brachio' ? 1.3 : .95) - headUp * .55 - lean - bob / h * 2 + lunge * .25 + this.lookX) + sl * (S.sleepNeck ?? .6) * wd
+      const rx = share * (headDown * (S.key === 'brachio' ? 1.3 : .95) + lean_extra * 4 - headUp * .55 - lean - bob / h * 2 + lunge * .25 + this.lookX) + sl * (S.sleepNeck ?? .6) * wd
         + (i === S.head ? -lunge * .35 + headUp * .2 - sl * (S.sleepHead || 0) : 0) + Math.sin(t * 40) * .006 * tremor + (biped && i === S.head ? -run * .12 * mv : 0);
       b.rotation.set(rx, share * (this.lookY + turn * .25 + pelYaw * .8 + sl * sSide * (S.sleepCurl ?? .35)), share * -roll * .6); }
-    bones[S.chest].position.z += lunge * .05 * S.size / 6;
+    bones[S.chest].position.z += lunge * .05 * S.size / 6; bones[S.chest].position.y -= this._splay * .1 * h;
     bones[this.B.jawBone].rotation.x = jaw * (S.key === 'trex' ? .62 : S.quad ? .35 : .5);
     this.blinkT -= dt; if (this.blinkT < 0){ this.blink += dt / .08; if (this.blink >= 2){ this.blink = 0; this.blinkT = 2 + this.rnd() * 5; } }
     const lid = Math.max(sl, this.blink < 1 ? this.blink : 2 - this.blink, 0);
@@ -775,7 +1117,7 @@ export class Dino {
         if (run > .05){ const kick = Math.sin(Math.PI * clamp(u / .55, 0, 1)) * run; zoff -= A * .22 * kick; lift += liftH * .25 * kick; } }
       zoff *= mv;
       const b0 = bones[bs[0]]; _mA.multiplyMatrices(_inv, b0.parent.matrixWorld); _qp.setFromRotationMatrix(_mA); _p0.copy(b0.position).applyMatrix4(_mA);
-      _B.copy(Lg.ball); _B.z += zoff + sl * (li.front ? -(S.sleepFoot ? .3 : .12) : (S.sleepFoot ? .32 : .1)) * legH; _B.x += sl * li.side * (S.sleepFoot || 0) * .25 * legH; _B.y += lift;
+      _B.copy(Lg.ball); _B.z += zoff + sl * (li.front ? -(S.sleepFoot ? .3 : .12) : (S.sleepFoot ? .32 : .1)) * legH; _B.x += sl * li.side * (S.sleepFoot || 0) * .25 * legH + (li.front ? li.side * this._splay * .3 * legH : 0); _B.y += lift;
       const alpha = Lg.alpha0 + push * .5 * mv * (li.front ? .6 : 1) + curl * .25 * mv + sl * ((li.front ? .9 : 1.42) - Lg.alpha0);
       _A.set(_B.x, _B.y + Lg.mt * Math.cos(alpha), _B.z - Lg.mt * Math.sin(alpha));
       const L1 = li.len[0], L2 = li.len[1]; _d.subVectors(_A, _p0); let dd = _d.length(); const dmax = (L1 + L2) * .999, dmin = Math.abs(L1 - L2) + 1e-3;
@@ -789,6 +1131,19 @@ export class Dino {
     }
   }
 }
+export const SCHEMES = [
+  { id: 'natural', name: 'Natural', sw: null },
+  { id: 'forest', name: 'Forest', top: 0x3e4a2c, belly: 0xa8a684, mark: 0x1e2614 },
+  { id: 'desert', name: 'Desert', top: 0x9a7a4e, belly: 0xe2cfa4, mark: 0x5a3e22 },
+  { id: 'slate', name: 'Slate', top: 0x4e555a, belly: 0xb4b2a8, mark: 0x23272a },
+  { id: 'savanna', name: 'Savanna', top: 0x8c6a3a, belly: 0xd8c08c, mark: 0x3a2614, pat: 2 },
+  { id: 'albino', name: 'Albino', top: 0xd8d0c0, belly: 0xf0eadc, mark: 0xb8a898 },
+  { id: 'ember', name: 'Ember', bold: true, top: 0x8a2a1a, belly: 0xe0b080, mark: 0x2a0e08 },
+  { id: 'jade', name: 'Jade', bold: true, top: 0x1f6a54, belly: 0xc8d8a8, mark: 0x0e2a22 },
+  { id: 'tiger', name: 'Tiger', bold: true, top: 0xc8782a, belly: 0xf0e0c0, mark: 0x1a120a, pat: 1 },
+  { id: 'midnight', name: 'Midnight', bold: true, top: 0x23283e, belly: 0x9a9cae, mark: 0x5a6ac0 },
+];
+export const PATTERNS = [{ id: -1, name: 'Species' }, { id: 0, name: 'Blotches' }, { id: 1, name: 'Stripes' }, { id: 2, name: 'Spots' }, { id: 3, name: 'Bands' }, { id: 4, name: 'Plain' }];
 export const SPECIES_DATA = SPECIES;
 export function prewarm(keys){ for (const k of keys) buildSpecies(k); }
 export function dinoStats(){ const o = {}; for (const k in BUILT) o[k] = { tris: BUILT[k].tris, ms: Math.round(BUILT[k].buildMs) }; return o; }
