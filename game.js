@@ -41,7 +41,7 @@ const SPECIES = {
 };
 const SP_KEYS = ['para', 'trike', 'stego', 'dilo', 'ankylo', 'raptor', 'brachio', 'trex'];
 const BUILD = {
-  path:     { name: 'Footpath', cost: 150, desc: 'Guests walk on paths. Drag to paint.', stars: 0 },
+  path:     { name: 'Footpath', cost: 150, desc: 'Guests walk on paths. Tap point to point.', stars: 0 },
   hatchery: { name: 'Hatchery', cost: 60000, upkeep: 2200, desc: 'Incubates dinosaur eggs. Two at a time.', stars: 0 },
   ranger:   { name: 'Ranger Station', cost: 40000, upkeep: 2400, desc: 'Maintains nearby fences. Cheaper, faster containment.', stars: 0 },
   food:     { name: 'Food Stand', cost: 9000, upkeep: 500, desc: 'Burgers and drinks. Must face a path.', stars: 0 },
@@ -456,7 +456,7 @@ function updateDino(d, dt){
       else { d.wait -= dt; const dist = Math.hypot(d.tx - d.x, d.tz - d.z);
         if (dist < 1.2 || d.wait < -12){ if (d.wait <= 0){ if (d.stress > 0.55 && rnd() < 0.6){ // pace along the fence
               const side = (rnd() * 4) | 0; d.tx = side === 0 ? x0 : side === 1 ? x1 : fr(x0, x1); d.tz = side === 2 ? z0 : side === 3 ? z1 : fr(z0, z1); }
-            else { d.tx = fr(x0, Math.max(x0, x1)); d.tz = fr(z0, Math.max(z0, z1)); } d.wait = 1.5 + rnd() * 5; if (rnd() < 0.25 && d.roarCD < 0){ d.model.setAction('roar', 2); d.roarCD = 25 + rnd() * 40; if (S.diet === 'meat' || d.sp === 'trike' || d.sp === 'para') vocal(d); } else if (rnd() < 0.3) d.model.setAction('eat', 3); } }
+            else { d.tx = fr(x0, Math.max(x0, x1)); d.tz = fr(z0, Math.max(z0, z1)); } d.wait = 1.5 + rnd() * 5; if (rnd() < 0.25 && d.roarCD < 0){ d.model.setAction('roar', 2); d.roarCD = 20 + rnd() * 40; if (S.diet === 'meat' || d.sp === 'trike' || d.sp === 'para') ambientCall(d); } else if (rnd() < 0.3) d.model.setAction('eat', 3); } }
         else moveToward(d, d.tx, d.tz, speedMax * (d.stress > 0.6 ? 1.3 : 1), dt, turnRate); }
     }
     d.x = clamp(d.x, x0, Math.max(x0, x1)); d.z = clamp(d.z, z0, Math.max(z0, z1));
@@ -473,16 +473,18 @@ function updateDino(d, dt){
     // trample: stay in the park
     d.x = clamp(d.x, -HALF + 6, HALF - 6); d.z = clamp(d.z, -HALF + 6, HALF - 4);
     if (H(d.x, d.z) < 0.4){ d.hd += Math.PI * dt; }
-    if (d.roarCD < 0){ d.roarCD = 8 + rnd() * 8; d.model.setAction('roar', 2); vocal(d); }
+    if (d.roarCD < 0){ d.roarCD = 20 + rnd() * 20; d.model.setAction('roar', 2); ambientCall(d); }
   }
   // separation inside pens
   if (d.state === 'pen') for (const o of dinos){ if (o === d || o.pen !== d.pen || o.state !== 'pen') continue; const dx = d.x - o.x, dz = d.z - o.z, dd = Math.hypot(dx, dz), r = dinoRadius(d) + dinoRadius(o);
     if (dd < r && dd > 0.01){ const k = (r - dd) * 0.5 * Math.min(1, dt * 4); d.x += dx / dd * k; d.z += dz / dd * k; } }
   d.model.animate(dt, d.v, d.turn || 0); placeDinoModel(d);
-  // footsteps for big animals
-  if (SD.size >= 8 && d.v > 0.5){ const ph = Math.floor(d.model.phase / Math.PI); if (ph !== d.lastStep){ d.lastStep = ph; const vol = camVol(d.x, d.z) * (SD.size / 12); if (vol > 0.08) SFX.thud(vol, SD.size / 6); if (d.sp === 'trex' && vol > 0.25) cam.shake = Math.max(cam.shake, vol * 0.25); } }
 }
 function wanderLoose(d, dt, v, tr){ d.wait -= dt; const dist = Math.hypot(d.tx - d.x, d.tz - d.z); if (dist < 3 || d.wait < 0){ d.tx = clamp(d.x + fr(-40, 40), -HALF + 10, HALF - 10); d.tz = clamp(d.z + fr(-40, 40), -HALF + 10, HALF - 10); d.wait = 6 + rnd() * 6; } moveToward(d, d.tx, d.tz, v, dt, tr); }
+/* occasional calls only: each animal waits 20-60 s (roarCD), only nearby on-screen animals are heard, and the park plays at most one ambient call every ~8 s */
+let lastAmbientCall = -1e9; const _vc = new THREE.Vector3();
+function ambientCall(d){ const now = performance.now(); if (now - lastAmbientCall < 8000) return; const vol = camVol(d.x, d.z); if (vol < 0.2) return;
+  _vc.set(d.x, H(d.x, d.z) + 2, d.z).project(camera); if (_vc.z > 1 || Math.abs(_vc.x) > 1.1 || Math.abs(_vc.y) > 1.1) return; lastAmbientCall = now; vocal(d); }
 function vocal(d){ const vol = camVol(d.x, d.z); const SD = SPECIES_DATA[d.sp]; if (d.sp === 'raptor' || d.sp === 'dilo') SFX.screech(vol); else SFX.roar(SD.size / 5, vol); }
 function camVol(x, z){ const d = Math.hypot(camera.position.x - x, camera.position.z - z, camera.position.y - H(x, z)); return clamp(1.3 - d / 160, 0, 1); }
 function dinoHourly(d){
@@ -744,6 +746,8 @@ function endDay(){
 
 /* ================= UI ================= */
 const IC = {
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  rotate: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
   build: '<path d="M3 21h18M5 21V10l7-5 7 5v11"/><path d="M9 21v-6h6v6"/>',
   fence: '<path d="M4 20V7l2-3 2 3v13M16 20V7l2-3 2 3v13M4 10h16M4 16h16"/>',
   dino: '<path d="M3 17c2 0 3-1 4-3l2-5c1-2 3-3 5-3h3l3 2-2 2h-3l-1 3 2 2v4M9 14l-1 6M13 15l1 5M7 14c-2 1-3 3-4 3"/><circle cx="17.5" cy="7.5" r=".6" fill="currentColor"/>',
@@ -815,12 +819,12 @@ function renderSheet(){
     const tab = sel.ref || 'facilities';
     h += header(tab === 'pens' ? 'Build an Enclosure' : 'Build', tab === 'pens' ? 'fence' : 'build');
     h += `<div class="tabs">${[['facilities', 'Facilities'], ['pens', 'Enclosures'], ['care', 'Dino Care'], ['paths', 'Paths']].map(([t, l]) => `<button class="tab ${t === tab ? 'on' : ''}" data-tab="${t}">${l}</button>`).join('')}</div><div class="bd">`;
-    if (tab === 'pens'){ h += `<div class="note">Pick a fence, then drag a rectangle on open ground. Stronger fences cost more but hold bigger animals. Cheap fences mean breakouts.</div><div class="cards">`;
+    if (tab === 'pens'){ h += `<div class="note">Pick a fence, then tap two opposite corners on open ground and press Build. Stronger fences cost more but hold bigger animals. Cheap fences mean breakouts.</div><div class="cards">`;
       FT.forEach((f, t) => { const lock = G.stars < FENCE_STARS[t] && !G.unlockAll; const holds = SP_KEYS.filter(s => SPECIES[s].str <= f.str - 0.75).map(s => SPECIES[s].short);
         h += `<button class="card ${lock ? 'lock' : ''}" data-fence="${t}">${lock ? `<span class="tag">${FENCE_STARS[t]} STARS</span>` : ''}<span class="nm"><span class="swatch" style="background:${f.color}"></span>${f.name}</span><span class="ds">${f.desc}</span><span class="ds">Holds: ${holds.length ? holds.join(', ') : 'nothing dangerous'}</span><span class="pr">${fmt(f.cost)} <small style="font-size:11px;color:var(--bone2)">per tile edge</small></span></button>`; });
       h += `</div>`; }
-    else if (tab === 'paths'){ h += `<div class="cards"><button class="card" data-tool="path"><span class="nm">${ic('path')}Footpath</span><span class="ds">Drag to paint gravel paths. Guests only walk on paths connected to the gate.</span><span class="pr">${fmt(BUILD.path.cost)} / tile</span></button>
-      <button class="card" data-tool="bulldoze"><span class="nm">${ic('bulldoze')}Bulldoze</span><span class="ds">Drag over paths, or tap a building or enclosure to remove it. Half refund.</span><span class="pr">Refunds 50%</span></button></div>`; }
+    else if (tab === 'paths'){ h += `<div class="cards"><button class="card" data-tool="path"><span class="nm">${ic('path')}Footpath</span><span class="ds">Tap point to point to lay gravel paths, then Done. Guests only walk on paths connected to the gate.</span><span class="pr">${fmt(BUILD.path.cost)} / tile</span></button>
+      <button class="card" data-tool="bulldoze"><span class="nm">${ic('bulldoze')}Bulldoze</span><span class="ds">Tap a path tile, building or feeder to remove it. Half refund.</span><span class="pr">Refunds 50%</span></button></div>`; }
     else { const list = tab === 'care' ? ['hatchery', 'meat', 'plant', 'ranger'] : ['hatchery', 'food', 'restroom', 'gift', 'viewing', 'ranger'];
       h += `<div class="cards">` + list.map(t => { const B = BUILD[t]; const lock = G.stars < B.stars && !G.unlockAll; return `<button class="card ${lock ? 'lock' : ''}" data-bld="${t}">${lock ? `<span class="tag">${B.stars} STARS</span>` : ''}<span class="nm">${ic(t)}${B.name}</span><span class="ds">${B.desc}</span><span class="pr">${fmt(B.cost)}${B.upkeep ? ` <small style="font-size:11px;color:var(--bone2)">+${fmtK(B.upkeep)}/day</small>` : ''}</span></button>`; }).join('') + `</div>`; }
     h += `</div>`;
@@ -953,7 +957,7 @@ function showDaySummary(s){
 /* ---------- tutorial ---------- */
 const TUT = [
   ['Welcome, Director', 'This island is yours to build on. Drag with one finger to orbit the camera, pinch to zoom, and drag with two fingers to pan. On a computer, drag to orbit, right-drag to pan and scroll to zoom.'],
-  ['Build an enclosure', 'Tap Enclosure, choose a fence and drag a rectangle beside the main path. Wooden fences are cheap but only hold Parasaurolophus. Bigger animals need stronger fences.'],
+  ['Build an enclosure', 'Tap Enclosure, choose a fence and tap two opposite corners beside the main path. Wooden fences are cheap but only hold Parasaurolophus. Bigger animals need stronger fences.'],
   ['Hatch a dinosaur', 'Build a Hatchery from Build. Then tap your enclosure, choose Add dinosaur, and add a feeder that matches its diet. Hungry, crowded or lonely animals get stressed and test their fences.'],
   ['Guests pay the bills', 'Guests arrive at the gate and walk the paths. Dinosaurs they can see near the paths keep them happy. Food stands, restrooms and gift shops earn extra. Watch the safety rating.'],
   ['Your call', 'Carnivore enclosures have a Feed a guest button. It sells a lot of tickets. It also costs reputation and safety, and invites lawsuits. Breakouts happen when you cheap out on fences, so keep rangers nearby.'],
@@ -995,33 +999,69 @@ function setOverlay(i0, j0, i1, j1, ok){
   per(x0, z0, x0 + w, z0); per(x0 + w, z0, x0 + w, z0 + d); per(x0 + w, z0 + d, x0, z0 + d); per(x0, z0 + d, x0, z0);
   outline.geometry.dispose(); outline.geometry = new THREE.BufferGeometry().setFromPoints(pts); outline.visible = true; outlineMat.color.set(ok ? 0xfff0b0 : 0xff8a6a);
 }
-function hideOverlay(){ overlay.visible = false; outline.visible = false; if (ghost){ scene.remove(ghost); ghost = null; } }
-function startTool(t){ tool = t; closeSheet(); TU.uGrid.value = 1; $('dock').classList.add('hidden'); renderToolbar(); $('toolbar').classList.remove('hidden');
-  if (t.kind === 'bld'){ ghost = new THREE.Mesh(bldGeo(t.type), ghostMat); ghost.visible = false; scene.add(ghost); } }
-function cancelTool(){ if (!tool) return; tool = null; TU.uGrid.value = 0; hideOverlay(); $('toolbar').classList.add('hidden'); if (G.running) $('dock').classList.remove('hidden'); }
+function hideOverlay(){ overlay.visible = false; outline.visible = false; if (ghost){ scene.remove(ghost); ghost = null; } clearPending(); }
+/* ---- pending path preview (nothing is built until Done) ---- */
+const pendMat = new THREE.MeshBasicMaterial({ color: 0xe0a43a, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, fog: false });
+const pendMesh = new THREE.Mesh(new THREE.BufferGeometry(), pendMat); pendMesh.visible = false; pendMesh.renderOrder = 5; scene.add(pendMesh);
+const nodeMat = new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.95, depthTest: false, fog: false });
+const nodeMatLast = new THREE.MeshBasicMaterial({ color: 0xffb648, transparent: true, opacity: 0.95, depthTest: false, fog: false });
+const nodeGeo = new THREE.CylinderGeometry(1.1, 1.1, 0.25, 20);
+let nodeMeshes = [];
+function clearPending(){ pendMesh.visible = false; for (const m of nodeMeshes) scene.remove(m); nodeMeshes = []; }
+function pathRoute(a, b){ const out = []; let [i, j] = a; const [i1, j1] = b; const xFirst = Math.abs(i1 - i) >= Math.abs(j1 - j);
+  out.push([i, j]); const stepI = () => { while (i !== i1){ i += Math.sign(i1 - i); out.push([i, j]); } }, stepJ = () => { while (j !== j1){ j += Math.sign(j1 - j); out.push([i, j]); } };
+  if (xFirst){ stepI(); stepJ(); } else { stepJ(); stepI(); } return out; }
+function pathTileOk(i, j){ if (!inGrid(i, j)) return 'Outside the park'; const t = tileType[idx(i, j)]; if (t === T_EMPTY || t === T_PATH) return ''; return t === T_BLOCK ? 'Ground too rough for a path' : t === T_PEN ? 'Paths cannot cross an enclosure' : 'A building is in the way'; }
+function pendingTiles(){ const seen = new Set(), out = []; if (!tool || !tool.nodes) return out;
+  const add = ([i, j]) => { const k = idx(i, j); if (seen.has(k)) return; seen.add(k); if (tileType[k] === T_EMPTY) out.push([i, j]); };
+  if (tool.nodes.length === 1) add(tool.nodes[0]); for (const s of tool.segs) s.forEach(add); return out; }
+function pendingCost(){ return pendingTiles().length * BUILD.path.cost; }
+function drawPending(){ clearPending(); if (!tool || tool.kind !== 'path' || !tool.nodes || !tool.nodes.length) return;
+  const all = []; const seen = new Set(); const push = ([i, j]) => { const k = idx(i, j); if (!seen.has(k)){ seen.add(k); all.push([i, j]); } }; tool.nodes.forEach(push); tool.segs.forEach(s => s.forEach(push));
+  const pos = []; const q = TILE * 0.47;
+  for (const [i, j] of all){ const cx = tX(i), cz = tZ(j); const c = [[-q, -q], [q, -q], [q, q], [-q, q]].map(([a, b]) => [cx + a, H(cx + a, cz + b) + 0.16, cz + b]); pos.push(...c[0], ...c[1], ...c[2], ...c[0], ...c[2], ...c[3]); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); pendMesh.geometry.dispose(); pendMesh.geometry = g; pendMesh.visible = true;
+  tool.nodes.forEach((n, k) => { const m = new THREE.Mesh(nodeGeo, k === tool.nodes.length - 1 ? nodeMatLast : nodeMat); const x = tX(n[0]), z = tZ(n[1]); m.position.set(x, H(x, z) + 0.4, z); m.renderOrder = 7; scene.add(m); nodeMeshes.push(m); }); }
+function startTool(t){ tool = t; closeSheet(); TU.uGrid.value = 1; $('dock').classList.add('hidden');
+  if (t.kind === 'path'){ t.nodes = []; t.segs = []; }
+  if (t.kind === 'bld'){ ghost = new THREE.Mesh(bldGeo(t.type), ghostMat); ghost.visible = false; scene.add(ghost); t.rot = null; t.hover = null; }
+  renderToolbar(); $('toolbar').classList.remove('hidden'); placeUndoBar(); }
+function cancelTool(){ if (!tool) return; if (tool.move){ const m = tool.move; tool.move = null; const opts = { id: m.id }; if (!BUILD[m.type].inPen) opts.rot = m.rot; placeBuilding(m.type, m.i, m.j, opts); afterStructureChange(); } tool = null; TU.uGrid.value = 0; hideOverlay(); $('toolbar').classList.add('hidden'); if (G.running) $('dock').classList.remove('hidden'); placeUndoBar(); }
 function renderToolbar(){
   if (!tool) return; const tb = $('toolbar'); let title = '', hint = '', cost = '', costBad = false, btns = '';
-  if (tool.kind === 'path'){ title = 'Footpath'; hint = 'Drag across the ground to paint a path.'; cost = fmt(BUILD.path.cost) + ' / tile'; btns = `<button class="btn pri" data-t="done">Done</button>`; }
-  if (tool.kind === 'bulldoze'){ title = 'Bulldoze'; hint = 'Drag over paths. Tap a building or feeder to remove it.'; btns = `<button class="btn pri" data-t="done">Done</button>`; }
-  if (tool.kind === 'bld'){ const B = BUILD[tool.type]; title = B.name; hint = B.inPen ? 'Tap a tile inside an enclosure.' : 'Tap open ground next to a path.'; cost = fmt(B.cost); costBad = G.money < B.cost; btns = `<button class="btn pri" data-t="done">Done</button>`; }
+  if (tool.kind === 'path'){ title = 'Footpath'; const n = tool.nodes.length, tiles = pendingTiles().length, c = tiles * BUILD.path.cost;
+    hint = !n ? 'Tap where the path starts. Drag to look around.' : n === 1 ? 'Tap the next point to lay a segment.' : `${tool.segs.length} segment${tool.segs.length > 1 ? 's' : ''}, ${tiles} new tile${tiles === 1 ? '' : 's'}. Tap to extend.`;
+    cost = n ? fmt(c) : fmt(BUILD.path.cost) + ' / tile'; costBad = n > 0 && G.money < c;
+    btns = `<button class="btn" data-t="exit">Cancel</button><button class="btn" data-t="undo" ${n ? '' : 'disabled'}>${ic('undo')}Undo</button><button class="btn pri" data-t="pathdone" ${costBad ? 'disabled' : ''}>${tiles ? 'Done' : 'Close'}</button>`; }
+  if (tool.kind === 'bulldoze'){ title = 'Bulldoze'; hint = 'Tap a path tile, building or feeder to remove it (50% refund). Drag to look around.'; btns = `<button class="btn pri" data-t="exit">Done</button>`; }
+  if (tool.kind === 'bld'){ const B = BUILD[tool.type]; const mv = !!tool.move; title = (mv ? 'Move ' : '') + B.name; cost = mv ? 'Free' : fmt(B.cost); const hv = tool.hover; const ok = hv && hv[2].ok; const funds = mv || G.money >= B.cost;
+    costBad = !funds || (hv && !ok);
+    hint = !hv ? (B.inPen ? 'Tap a tile inside an enclosure to preview.' : 'Tap open ground next to a path to preview.') + ' Drag to look around.' : !ok ? hv[2].why : !funds ? 'Not enough funds.' : mv ? 'Drag it or tap a new spot, then Place. Cancel puts it back.' : 'Green means it fits. Drag the preview or tap elsewhere to move it.';
+    btns = `<button class="btn" data-t="rotate" ${hv && !B.inPen ? '' : 'disabled'}>${ic('rotate')}Rotate</button><button class="btn" data-t="exit">${hv || mv ? 'Cancel' : 'Close'}</button><button class="btn pri" data-t="place" ${ok && funds ? '' : 'disabled'}>Place</button>`; }
   if (tool.kind === 'pen'){ title = 'Enclosure'; const r = tool.rect;
     if (r){ const i0 = Math.min(r[0], r[2]), i1 = Math.max(r[0], r[2]), j0 = Math.min(r[1], r[3]), j1 = Math.max(r[1], r[3]); const chk = penCanBuild(i0, j0, i1, j1); const c = penCost(i0, j0, i1, j1, tool.tier);
-      hint = chk.ok ? `${i1 - i0 + 1} x ${j1 - j0 + 1} tiles (${(i1 - i0 + 1) * TILE} m x ${(j1 - j0 + 1) * TILE} m)` : chk.why; cost = fmt(c); costBad = !chk.ok || G.money < c;
-      btns = tool.pending ? `<button class="btn" data-t="cancel">Cancel</button><button class="btn pri" data-t="confirm" ${costBad ? 'disabled' : ''}>Build</button>` : `<button class="btn" data-t="done">Cancel</button>`; }
-    else { hint = 'Drag a rectangle on open ground.'; btns = `<button class="btn" data-t="done">Cancel</button>`; }
+      hint = tool.pending ? (chk.ok ? `${i1 - i0 + 1} x ${j1 - j0 + 1} tiles (${(i1 - i0 + 1) * TILE} m x ${(j1 - j0 + 1) * TILE} m). Tap to move this corner.` : chk.why) : 'Now tap the opposite corner.'; cost = tool.pending ? fmt(c) : ''; costBad = !chk.ok || G.money < c;
+      btns = tool.pending ? `<button class="btn" data-t="exit">Cancel</button><button class="btn" data-t="cancel">Restart</button><button class="btn pri" data-t="confirm" ${costBad ? 'disabled' : ''}>Build</button>` : `<button class="btn" data-t="exit">Cancel</button><button class="btn" data-t="cancel">Restart</button>`; }
+    else { hint = 'Tap one corner, then the opposite corner. Drag to look around.'; btns = `<button class="btn" data-t="exit">Cancel</button>`; }
   }
   tb.innerHTML = `<div class="top"><div class="t"><b>${title}</b><span>${hint}</span></div>${cost ? `<div class="cost ${costBad ? 'bad' : ''}">${cost}</div>` : ''}</div>` +
     (tool.kind === 'pen' ? `<div class="tiers">${FT.map((f, t) => `<button class="tab ${t === tool.tier ? 'on' : ''}" data-tier="${t}" ${G.stars < FENCE_STARS[t] && !G.unlockAll ? 'disabled style="opacity:.4"' : ''}><span class="swatch" style="background:${f.color}"></span>${f.name}</button>`).join('')}</div>` : '') +
     `<div class="btns" style="margin-top:0">${btns}</div>`;
+  placeUndoBar();
 }
-$('toolbar').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; SFX.unlock(); SFX.click();
+$('toolbar').onclick = (e) => { const b = e.target.closest('button'); if (!b || b.disabled || !tool) return; SFX.unlock(); SFX.click();
   if (b.dataset.tier !== undefined){ tool.tier = +b.dataset.tier; if (tool.rect) updatePenPreview(); renderToolbar(); return; }
-  const a = b.dataset.t; if (a === 'done'){ const back = tool.kind === 'pen' ? 'pens' : tool.kind === 'bld' && BUILD[tool.type].inPen ? 'care' : tool.kind === 'bld' ? 'facilities' : 'paths'; const penId = tool.pen; cancelTool(); if (penId && pens.has(penId)) openSheet('pen', penId); else if (back === 'paths') {} }
-  if (a === 'cancel'){ tool.rect = null; tool.pending = false; hideOverlay(); renderToolbar(); }
+  const a = b.dataset.t;
+  if (a === 'exit'){ const penId = tool.pen; cancelTool(); if (penId && pens.has(penId)) openSheet('pen', penId); return; }
+  if (a === 'cancel'){ tool.rect = null; tool.pending = false; tool.a = null; hideOverlay(); renderToolbar(); return; }
+  if (a === 'undo' && tool.kind === 'path'){ if (tool.segs.length) tool.segs.pop(); tool.nodes.pop(); drawPending(); renderToolbar(); return; }
+  if (a === 'pathdone'){ commitPaths(); return; }
+  if (a === 'rotate' && tool.hover){ const [i, j] = tool.hover, [w, h] = footprint(tool.type, 0); const cur = tool.rot ?? faceRot(i, j, w, h); tool.rot = Math.round((cur + Math.PI / 2) / (Math.PI / 2)) % 4 * (Math.PI / 2); setPreview([i + Math.floor((w - 1) / 2), j + Math.floor((h - 1) / 2)]); return; }
+  if (a === 'place'){ commitBuilding(); return; }
   if (a === 'confirm'){ const r = tool.rect; const i0 = Math.min(r[0], r[2]), i1 = Math.max(r[0], r[2]), j0 = Math.min(r[1], r[3]), j1 = Math.max(r[1], r[3]); const c = penCost(i0, j0, i1, j1, tool.tier);
-    if (penCanBuild(i0, j0, i1, j1).ok && G.money >= c){ spend('build', c); const pen = createPen(i0, j0, i1, j1, tool.tier); afterStructureChange(); SFX.build(); dust((eX(i0) + eX(i1 + 1)) / 2, (eX(j0) + eX(j1 + 1)) / 2, 6, 8); cancelTool(); openSheet('pen', pen.id); toast(`${pen.name} built. Now add a dinosaur and a feeder.`, 'good'); } }
+    if (penCanBuild(i0, j0, i1, j1).ok && G.money >= c){ spend('build', c); const pen = createPen(i0, j0, i1, j1, tool.tier); afterStructureChange(); SFX.build(); dust((eX(i0) + eX(i1 + 1)) / 2, (eX(j0) + eX(j1 + 1)) / 2, 6, 8); cancelTool(); recordUndo({ kind: 'pen', pen, cost: c, label: pen.name }); openSheet('pen', pen.id); toast(`${pen.name} built. Now add a dinosaur and a feeder.`, 'good'); } }
 };
-function updatePenPreview(){ const r = tool.rect; const i0 = Math.min(r[0], r[2]), i1 = Math.max(r[0], r[2]), j0 = Math.min(r[1], r[3]), j1 = Math.max(r[1], r[3]); setOverlay(i0, j0, i1, j1, penCanBuild(i0, j0, i1, j1).ok && G.money >= penCost(i0, j0, i1, j1, tool.tier)); }
+function updatePenPreview(){ const r = tool.rect; const i0 = Math.min(r[0], r[2]), i1 = Math.max(r[0], r[2]), j0 = Math.min(r[1], r[3]), j1 = Math.max(r[1], r[3]); setOverlay(i0, j0, i1, j1, !tool.pending || (penCanBuild(i0, j0, i1, j1).ok && G.money >= penCost(i0, j0, i1, j1, tool.tier))); }
 let lastPaint = null, paintCount = 0;
 function paintTile(i, j, erase){
   if (!inGrid(i, j)) return; const k = idx(i, j);
@@ -1030,33 +1070,68 @@ function paintTile(i, j, erase){
 }
 function paintLine(a, b, erase){ let [x0, y0] = a; const [x1, y1] = b; const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx - dy;
   for (let n = 0; n < 200; n++){ paintTile(x0, y0, erase); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 > -dy){ err -= dy; x0 += sx; } else if (e2 < dx){ err += dx; y0 += sy; } } }
-function toolDown(p){ const t = tileAtScreen(p.x, p.y); if (!t) return;
-  if (tool.kind === 'path' || tool.kind === 'bulldoze'){ paintCount = 0; lastPaint = t; paintLine(t, t, tool.kind === 'bulldoze'); drawMask(); }
-  if (tool.kind === 'pen'){ tool.rect = [t[0], t[1], t[0], t[1]]; tool.pending = false; updatePenPreview(); renderToolbar(); }
-  if (tool.kind === 'bld') toolHover(t);
+/* a deliberate tap (no camera drag) is the only thing that edits a preview */
+function toolTap(p){ const t = tileAtScreen(p.x, p.y); if (!t){ return; }
+  if (tool.kind === 'bld'){ setPreview(t); keepPreviewVisible(); return; }
+  if (tool.kind === 'bulldoze'){ bulldozeTap(p); return; }
+  if (tool.kind === 'path'){ const N = tool.nodes; const why = pathTileOk(t[0], t[1]); if (why){ toast(why, 'bad'); return; }
+    if (!N.length){ N.push(t); drawPending(); renderToolbar(); return; }
+    const last = N[N.length - 1]; if (last[0] === t[0] && last[1] === t[1]) return;
+    const route = pathRoute(last, t); const bad = route.map(([i, j]) => pathTileOk(i, j)).find(Boolean); if (bad){ toast(bad, 'bad'); return; }
+    if (route.length > 120){ toast('Segment too long. Tap a closer point.', 'bad'); return; }
+    tool.segs.push(route); N.push(t); SFX.click(); drawPending(); renderToolbar(); return; }
+  if (tool.kind === 'pen'){
+    if (!tool.a){ tool.a = t; tool.rect = [t[0], t[1], t[0], t[1]]; tool.pending = false; }
+    else { tool.rect = [tool.a[0], tool.a[1], t[0], t[1]]; tool.pending = true; }
+    updatePenPreview(); renderToolbar(); }
 }
-function toolMove(p){ const t = tileAtScreen(p.x, p.y); if (!t) return;
-  if ((tool.kind === 'path' || tool.kind === 'bulldoze') && lastPaint && (t[0] !== lastPaint[0] || t[1] !== lastPaint[1])){ paintLine(lastPaint, t, tool.kind === 'bulldoze'); lastPaint = t; drawMask(); }
-  if (tool.kind === 'pen' && tool.rect){ tool.rect[2] = t[0]; tool.rect[3] = t[1]; updatePenPreview(); renderToolbar(); }
-  if (tool.kind === 'bld') toolHover(t);
-}
-function toolUp(p, tapped){
-  if (tool.kind === 'path' || tool.kind === 'bulldoze'){ if (paintCount){ afterStructureChange(); SFX.build(); } else if (tapped && tool.kind === 'bulldoze') bulldozeTap(p); lastPaint = null; }
-  if (tool.kind === 'pen' && tool.rect){ tool.pending = true; renderToolbar(); }
-  if (tool.kind === 'bld' && tapped){ const t = tileAtScreen(p.x, p.y); if (t) tryPlace(t); }
-}
-function toolHover(t){ const ty = tool.type, [w, h] = footprint(ty, 0); const i = t[0] - Math.floor((w - 1) / 2), j = t[1] - Math.floor((h - 1) / 2); const chk = canPlace(ty, i, j); setOverlay(i, j, i + w - 1, j + h - 1, chk.ok && G.money >= BUILD[ty].cost);
-  if (ghost){ ghost.visible = true; const cx = tX(i) + (w - 1) * TILE / 2, cz = tZ(j) + (h - 1) * TILE / 2; ghost.position.set(cx, H(cx, cz), cz); ghost.rotation.y = BUILD[ty].inPen ? 0 : faceRot(i, j, w, h); ghostMat.color.set(chk.ok ? 0xb8ffb0 : 0xff8a6a); } tool.hover = [i, j, chk]; }
-function tryPlace(t){ toolHover(t); const [i, j, chk] = tool.hover; const B = BUILD[tool.type];
-  if (!chk.ok){ toast(chk.why, 'bad'); return; } if (G.money < B.cost){ toast('Not enough funds.', 'bad'); return; }
-  spend('build', B.cost); const b = placeBuilding(tool.type, i, j); SFX.build(); dust(b.x, b.z, 4, 6); afterStructureChange();
-  if (['food', 'gift', 'restroom', 'hatchery', 'ranger'].includes(tool.type) && !b.rot && !isPath(i, j + b.h)) { const any = faceRot(i, j, b.w, b.h) !== 0 || [[0, -1], [-1, 0], [b.w, 0]].some(([di, dj]) => isPath(i + di, j + dj)); if (!any && tool.type !== 'hatchery' && tool.type !== 'ranger') toast('Tip: shops must touch a path to get customers.', ''); }
+function setPreview(t){ const ty = tool.type, [w, h] = footprint(ty, 0); const i = t[0] - Math.floor((w - 1) / 2), j = t[1] - Math.floor((h - 1) / 2); const chk = canPlace(ty, i, j); const ok = chk.ok && (tool.move || G.money >= BUILD[ty].cost);
+  setOverlay(i, j, i + w - 1, j + h - 1, ok);
+  if (ghost){ ghost.visible = true; const cx = tX(i) + (w - 1) * TILE / 2, cz = tZ(j) + (h - 1) * TILE / 2; ghost.position.set(cx, H(cx, cz), cz); ghost.rotation.y = BUILD[ty].inPen ? 0 : (tool.rot ?? faceRot(i, j, w, h)); ghostMat.color.set(ok ? 0x7dff6a : 0xff5a3a); ghostMat.emissive.set(ok ? 0x1f5a14 : 0x6a1408); }
+  tool.hover = [i, j, chk]; renderToolbar(); }
+const _pvp = new THREE.Vector3();
+function keepPreviewVisible(){ if (!ghost || !ghost.visible) return; const tb = $('toolbar').getBoundingClientRect(); _pvp.copy(ghost.position); _pvp.y += 4; _pvp.project(camera);
+  const sy = (-_pvp.y * 0.5 + 0.5) * innerHeight; if (sy > tb.top - 40 || sy < 150){ cam.goal.tx = ghost.position.x; cam.goal.tz = ghost.position.z; cam.follow = null; } }
+function commitBuilding(){ const hv = tool.hover; if (!hv) return; const [i, j] = hv; const B = BUILD[tool.type]; const chk = canPlace(tool.type, i, j);
+  if (!chk.ok){ toast(chk.why, 'bad'); return; }
+  if (tool.move){ const m = tool.move; const opts = { id: m.id }; if (!B.inPen) opts.rot = tool.rot ?? faceRot(i, j, m.w, m.h); const b = placeBuilding(m.type, i, j, opts); tool.move = null; SFX.build(); dust(b.x, b.z, 3, 5); afterStructureChange(); cancelTool(); toast(`${B.name} moved.`, 'good'); return; } if (G.money < B.cost){ toast('Not enough funds.', 'bad'); return; }
+  spend('build', B.cost); const opts = {}; if (!B.inPen && tool.rot != null) opts.rot = tool.rot; const b = placeBuilding(tool.type, i, j, opts); SFX.build(); dust(b.x, b.z, 4, 6); afterStructureChange();
+  recordUndo({ kind: 'bld', b, cost: B.cost, label: B.name });
+  if (['food', 'gift', 'restroom'].includes(tool.type)){ const touches = [[0, -1], [-1, 0], [b.w, 0], [0, b.h]].some(([di, dj]) => isPath(i + di, j + dj)); if (!touches) toast('Tip: shops must touch a path to get customers.', ''); }
   if (tool.type === 'hatchery' && !G.tutHatch){ G.tutHatch = true; toast('Hatchery ready. Tap an enclosure and choose Add dinosaur.', 'good'); }
-}
+  tool.hover = null; tool.rot = null; overlay.visible = false; outline.visible = false; if (ghost) ghost.visible = false; renderToolbar(); }
+function commitPaths(){ const tiles = pendingTiles(), c = tiles.length * BUILD.path.cost;
+  if (!tiles.length){ cancelTool(); return; } if (G.money < c){ toast('Not enough funds.', 'bad'); return; }
+  for (const [i, j] of tiles) tileType[idx(i, j)] = T_PATH; spend('build', c); afterStructureChange(); SFX.build();
+  cancelTool(); recordUndo({ kind: 'paths', tiles, cost: c, label: `${tiles.length} path tile${tiles.length > 1 ? 's' : ''}` }); }
+/* press and hold (~0.5 s, finger still, no tool active) on a building or feeder picks it up to move it */
+function buildingAtScreen(x, y){ const t = tileAtScreen(x, y); if (!t) return null; const k = idx(t[0], t[1]);
+  if (tileType[k] === T_BUILD){ const b = buildings.get(tileRef[k]); return b && !BUILD[b.type].fixed ? b : null; }
+  if (tileType[k] === T_PEN){ const pen = pens.get(tileRef[k]); const f = pen && pen.feeders.find(f => f.i === t[0] && f.j === t[1]); return f ? buildings.get(f.id) : null; }
+  return null; }
+function pickUp(b, p){ closeSheet(); clearUndo(); const m = { id: b.id, type: b.type, i: b.i, j: b.j, w: b.w, h: b.h, rot: b.rot, pen: b.pen };
+  removeBuilding(b); afterStructureChange(); startTool({ kind: 'bld', type: b.type, pen: b.pen >= 0 ? b.pen : undefined }); tool.move = m; tool.rot = BUILD[b.type].inPen ? null : b.rot;
+  setPreview([m.i + Math.floor((m.w - 1) / 2), m.j + Math.floor((m.h - 1) / 2)]); if (ghost){ ghost.position.y += 0.8; ghost.scale.setScalar(1.06); }
+  try { navigator.vibrate && navigator.vibrate(18); } catch (e) {} SFX.click(); }
 function bulldozeTap(p){ const t = tileAtScreen(p.x, p.y); if (!t) return; const k = idx(t[0], t[1]);
+  if (tileType[k] === T_PATH){ if (t[1] === GATE.j && (t[0] === GATE.i || t[0] === GATE.i + 1)){ toast('The gate path stays.', ''); return; } tileType[k] = T_EMPTY; G.money += BUILD.path.cost * 0.5; afterStructureChange(); SFX.build(); return; }
   if (tileType[k] === T_BUILD){ const b = buildings.get(tileRef[k]); if (b && !BUILD[b.type].fixed){ G.money += BUILD[b.type].cost * 0.5; removeBuilding(b); afterStructureChange(); SFX.build(); } else toast('That cannot be removed.', ''); }
   else if (tileType[k] === T_PEN){ const pen = pens.get(tileRef[k]); const f = pen.feeders.find(f => f.i === t[0] && f.j === t[1]); if (f){ const b = buildings.get(f.id); G.money += BUILD[b.type].cost * 0.5; removeBuilding(b); afterStructureChange(); } else toast('Open the enclosure to demolish it.', ''); }
 }
+/* ---- safety net: undo the last committed placement for 10 s, full refund ---- */
+let undoRec = null, undoTimer = 0;
+function recordUndo(r){ undoRec = Object.assign(r, { until: performance.now() + 10000 }); clearTimeout(undoTimer); undoTimer = setTimeout(clearUndo, 10000); renderUndoBar(); }
+function clearUndo(){ undoRec = null; clearTimeout(undoTimer); renderUndoBar(); }
+function refund(c){ G.money += c; G.ledger.build = (G.ledger.build || 0) - c; }
+function undoLast(){ const r = undoRec; if (!r) return; clearUndo();
+  if (r.kind === 'bld'){ const b = buildings.get(r.b.id); if (!b){ toast('Already removed.', ''); return; } removeBuilding(b); }
+  if (r.kind === 'paths'){ for (const [i, j] of r.tiles){ const k = idx(i, j); if (tileType[k] === T_PATH) tileType[k] = T_EMPTY; } }
+  if (r.kind === 'pen'){ if (!pens.has(r.pen.id)) return; if (dinos.some(d => d.pen === r.pen.id)){ toast('A dinosaur already lives there. Demolish it from the enclosure panel instead.', 'bad'); return; } if (sel && sel.kind === 'pen' && sel.ref === r.pen.id) closeSheet(); removePen(r.pen); }
+  refund(r.cost); afterStructureChange(); SFX.click(); updateHUD(); toast(`Undone. ${fmt(r.cost)} refunded.`, 'money'); }
+function renderUndoBar(){ const el = $('undoBar'); if (!undoRec){ el.classList.add('hidden'); return; }
+  el.innerHTML = `<span>Placed ${undoRec.label}</span><button class="btn" data-t="undolast">${ic('undo')}Undo</button>`; el.classList.remove('hidden'); placeUndoBar(); }
+function placeUndoBar(){ const el = $('undoBar'); if (!el || el.classList.contains('hidden')) return; const ref = tool ? $('toolbar') : $('dock'); const r = ref.getBoundingClientRect(); el.style.bottom = (r.height > 0 ? innerHeight - r.top + 8 : 90) + 'px'; }
+$('undoBar').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; SFX.unlock(); undoLast(); };
 function afterStructureChange(){ drawMask(); computeExitField(); rebuildFences(); refreshVegetation(); computeViewMap(); }
 
 /* ================= camera + input ================= */
@@ -1068,7 +1143,8 @@ function updateCamera(dt){
   if (title.on){ g.yaw += dt * 0.04; }
   g.pitch = clamp(g.pitch, 0.1, 1.45); g.dist = clamp(g.dist, 12, 330); g.tx = clamp(g.tx, -HALF - 40, HALF + 40); g.tz = clamp(g.tz, -HALF - 60, HALF + 40);
   const k = 10; cam.tx = damp(cam.tx, g.tx, k, dt); cam.tz = damp(cam.tz, g.tz, k, dt); cam.dist = damp(cam.dist, g.dist, k, dt); cam.pitch = damp(cam.pitch, g.pitch, k, dt);
-  let dy = g.yaw - cam.yaw; cam.yaw += dy * (1 - Math.exp(-k * dt));
+  let dy = g.yaw - cam.yaw; if (dy > Math.PI || dy < -Math.PI){ dy = ((dy + Math.PI) % TAU + TAU) % TAU - Math.PI; g.yaw = cam.yaw + dy; }
+  cam.yaw += dy * (1 - Math.exp(-k * dt));
   const ty = Math.max(H(cam.tx, cam.tz), 0) + (cam.follow ? SPECIES_DATA[cam.follow.sp].size * 0.2 : 0.5);
   const cp = Math.cos(cam.pitch); let px = cam.tx + Math.sin(cam.yaw) * cp * cam.dist, pz = cam.tz + Math.cos(cam.yaw) * cp * cam.dist, py = ty + Math.sin(cam.pitch) * cam.dist;
   const floor = Math.max(H(px, pz), 0) + 2.5; if (py < floor){ py = floor; }
@@ -1076,8 +1152,8 @@ function updateCamera(dt){
   camera.position.set(px + (rnd() - 0.5) * sh, py + (rnd() - 0.5) * sh, pz + (rnd() - 0.5) * sh); camera.lookAt(cam.tx, ty, cam.tz);
 }
 const raycaster = new THREE.Raycaster(); const _ndc = new THREE.Vector2();
-function groundAtScreen(x, y){
-  _ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1); raycaster.setFromCamera(_ndc, camera); const o = raycaster.ray.origin, d = raycaster.ray.direction;
+function groundAtScreen(x, y, cm = camera){
+  _ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1); raycaster.setFromCamera(_ndc, cm); const o = raycaster.ray.origin, d = raycaster.ray.direction;
   let t = 0, prev = 0; for (let n = 0; n < 600; n++){ const px = o.x + d.x * t, py = o.y + d.y * t, pz = o.z + d.z * t; const h = Math.max(H(px, pz), -0.2);
     if (py < h){ let a = prev, b = t; for (let k = 0; k < 10; k++){ const m = (a + b) / 2; const mx = o.x + d.x * m, my = o.y + d.y * m, mz = o.z + d.z * m; if (my < Math.max(H(mx, mz), -0.2)) b = m; else a = m; } return new THREE.Vector3(o.x + d.x * b, o.y + d.y * b, o.z + d.z * b); }
     prev = t; t += Math.max(0.5, (py - h) * 0.5); if (t > 1500) break; }
@@ -1100,28 +1176,43 @@ function tap(x, y){
 const ptrs = new Map(); let gesture = null;
 function pinchInfo(){ const a = [...ptrs.values()]; const cx = (a[0].x + a[1].x) / 2, cy = (a[0].y + a[1].y) / 2; return { cx, cy, d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y), ang: Math.atan2(a[1].y - a[0].y, a[1].x - a[0].x) }; }
 canvas.addEventListener('pointerdown', (e) => {
-  SFX.unlock(); canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), btn: e.button });
+  SFX.unlock(); try { canvas.setPointerCapture(e.pointerId); } catch (err) {} ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), btn: e.button });
   if (title.on) return;
-  if (ptrs.size === 1){ gesture = { kind: e.button === 2 || e.button === 1 ? 'pan' : 'one', moved: false, tool: false };
-    if (tool && gesture.kind === 'one' && tool.kind !== 'bld'){ gesture.tool = true; toolDown(ptrs.get(e.pointerId)); } }
-  else if (ptrs.size === 2){ if (gesture && gesture.tool && tool && tool.kind === 'pen' && !tool.pending){ tool.rect = null; hideOverlay(); renderToolbar(); } if (gesture && gesture.tool && tool && (tool.kind === 'path' || tool.kind === 'bulldoze') && paintCount) afterStructureChange(); gesture = { kind: 'two', moved: true, last: pinchInfo() }; }
+  if (ptrs.size === 1){ gesture = { kind: e.button === 2 || e.button === 1 ? 'pan' : 'one', moved: false, ghost: false };
+    if (!tool && gesture.kind === 'one'){ const gs = gesture, pid = e.pointerId; gs.hold = setTimeout(() => { const q = ptrs.get(pid); if (gesture !== gs || gs.moved || ptrs.size !== 1 || !q || tool) return; const b = buildingAtScreen(q.x, q.y); if (!b) return; gs.held = true; pickUp(b, q); gs.ghost = true; }, 500); }
+    // a drag that starts on the building preview moves the preview; any other drag only moves the camera
+    if (tool && tool.kind === 'bld' && tool.hover && gesture.kind === 'one'){ const t = tileAtScreen(e.clientX, e.clientY); const [i, j] = tool.hover, [w, h] = footprint(tool.type, 0); if (t && t[0] >= i - 1 && t[0] <= i + w && t[1] >= j - 1 && t[1] <= j + h) gesture.ghost = true; } }
+  else if (ptrs.size === 2){ if (gesture && gesture.hold) clearTimeout(gesture.hold); gesture = { kind: 'two', moved: true, last: pinchInfo() }; }
 });
 canvas.addEventListener('pointermove', (e) => {
-  const p = ptrs.get(e.pointerId); if (!p){ if (tool && tool.kind === 'bld' && e.pointerType === 'mouse'){ const t = tileAtScreen(e.clientX, e.clientY); if (t) toolHover(t); } return; }
+  const p = ptrs.get(e.pointerId); if (!p) return;
   const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY; if (!gesture || title.on) return;
-  if (Math.hypot(p.x - p.sx, p.y - p.sy) > 7) gesture.moved = true;
-  if (gesture.kind === 'one'){ if (gesture.tool){ toolMove(p); return; } if (!gesture.moved) return; if (tool && tool.kind === 'bld'){ toolHover(tileAtScreen(p.x, p.y) || [0, 0]); }
+  if (Math.hypot(p.x - p.sx, p.y - p.sy) > 7){ gesture.moved = true; if (gesture.hold && !gesture.held){ clearTimeout(gesture.hold); gesture.hold = 0; } }
+  if (gesture.kind === 'one'){ if (!gesture.moved) return;
+    if (gesture.ghost){ const t = tileAtScreen(p.x, p.y); if (t){ setPreview(t); if (gesture.held && ghost){ ghost.position.y += 0.8; } } return; }
     cam.goal.yaw -= dx * 0.0065; cam.goal.pitch = clamp(cam.goal.pitch + dy * 0.005, 0.1, 1.45); cam.follow = null; }
   else if (gesture.kind === 'pan'){ panBy(dx, dy); }
-  else if (gesture.kind === 'two' && ptrs.size >= 2){ const n = pinchInfo(), l = gesture.last; panBy(n.cx - l.cx, n.cy - l.cy); if (l.d > 10) cam.goal.dist = clamp(cam.goal.dist * l.d / n.d, 12, 330); let da = n.ang - l.ang; if (da > Math.PI) da -= TAU; if (da < -Math.PI) da += TAU; cam.goal.yaw -= da; gesture.last = n; }
+  else if (gesture.kind === 'two' && ptrs.size >= 2){ const n = pinchInfo(); grabMap(gesture.last, n); gesture.last = n; }
 });
+/* Two fingers grab the map: the ground point under the pinch centre stays under the fingers while they move,
+   spread (zoom in) or twist (map turns the same way as the fingers). Rays use the target camera, not the smoothed one. */
+const goalCamera = new THREE.PerspectiveCamera();
+function syncGoalCamera(){ const g = cam.goal; goalCamera.fov = camera.fov; goalCamera.aspect = camera.aspect; goalCamera.near = camera.near; goalCamera.far = camera.far; goalCamera.updateProjectionMatrix();
+  const pitch = clamp(g.pitch, 0.1, 1.45), dist = clamp(g.dist, 12, 330); const ty = Math.max(H(g.tx, g.tz), 0) + 0.5; const cp = Math.cos(pitch);
+  goalCamera.position.set(g.tx + Math.sin(g.yaw) * cp * dist, ty + Math.sin(pitch) * dist, g.tz + Math.cos(g.yaw) * cp * dist); goalCamera.lookAt(g.tx, ty, g.tz); goalCamera.updateMatrixWorld(true); }
+function grabMap(l, n){ const g = cam.goal; cam.follow = null; syncGoalCamera(); const A = groundAtScreen(l.cx, l.cy, goalCamera);
+  if (l.d > 10 && n.d > 10) g.dist = clamp(g.dist * l.d / n.d, 12, 330);
+  let da = n.ang - l.ang; if (da > Math.PI) da -= TAU; if (da < -Math.PI) da += TAU; g.yaw += da;
+  syncGoalCamera(); const B = groundAtScreen(n.cx, n.cy, goalCamera);
+  if (A && B){ g.tx += A.x - B.x; g.tz += A.z - B.z; } else panBy(n.cx - l.cx, n.cy - l.cy); }
 function panBy(dx, dy){ const s = cam.goal.dist * 0.0018 * (900 / Math.max(innerHeight, 400)); const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw); cam.goal.tx += (-dx * cy - dy * sy) * s; cam.goal.tz += (dx * sy - dy * cy) * s; cam.follow = null; }
 function endPtr(e){ const p = ptrs.get(e.pointerId); if (!p) return; ptrs.delete(e.pointerId);
-  if (gesture && ptrs.size === 0){ const tapped = !gesture.moved && performance.now() - p.t < 450 && gesture.kind === 'one';
-    if (tool){ if (gesture.tool || tool.kind === 'bld') toolUp(p, tapped); }
-    else if (tapped) tap(p.x, p.y);
+  if (gesture && gesture.hold) clearTimeout(gesture.hold);
+  if (gesture && ptrs.size === 0){ const tapped = !gesture.moved && !gesture.held && performance.now() - p.t < 450 && gesture.kind === 'one';
+    if (gesture.held){ if (ghost){ ghost.scale.setScalar(1); if (tool && tool.hover && tool.move) setPreview([tool.hover[0] + Math.floor((tool.move.w - 1) / 2), tool.hover[1] + Math.floor((tool.move.h - 1) / 2)]); } keepPreviewVisible(); }
+    if (tapped){ if (tool) toolTap(p); else tap(p.x, p.y); }
     gesture = null; }
-  else if (ptrs.size === 1 && gesture && gesture.kind === 'two'){ gesture = { kind: 'one', moved: true, tool: false }; } }
+  else if (ptrs.size === 1 && gesture && gesture.kind === 'two'){ gesture = { kind: 'one', moved: true, ghost: false }; } }
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
 canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.goal.dist = clamp(cam.goal.dist * Math.exp(e.deltaY * 0.0012), 12, 330); }, { passive: false });
 const keys = new Set(); window.addEventListener('keydown', (e) => { keys.add(e.key.toLowerCase()); if (e.key === 'Escape'){ if (tool) cancelTool(); else closeSheet(); } if (e.key === ' ' && G.running){ G.speed = G.speed ? 0 : 1; updateHUD(); e.preventDefault(); } });
@@ -1161,7 +1252,7 @@ function serialize(){
   const paths = []; for (let k = 0; k < tileType.length; k++) if (tileType[k] === T_PATH) paths.push(k);
   const g = {}; for (const k in G) if (!['running', 'feeding', 'headless', 'score', 'avgHappy', 'tick', 'unlockAll', 'spawnAcc'].includes(k)) g[k] = G[k];
   return { v: 1, G: g, paths,
-    buildings: [...buildings.values()].map(b => ({ id: b.id, type: b.type, i: b.i, j: b.j, rot: b.rot, pen: b.pen })),
+    buildings: [...buildings.values()].map(b => ({ id: b.id, type: b.type, i: b.i, j: b.j, rot: b.rot, pen: b.pen })).concat(tool && tool.move ? [{ id: tool.move.id, type: tool.move.type, i: tool.move.i, j: tool.move.j, rot: tool.move.rot, pen: tool.move.pen }] : []),
     pens: [...pens.values()].map(p => ({ id: p.id, i0: p.i0, j0: p.j0, i1: p.i1, j1: p.j1, tier: p.tier, name: p.name, segs: p.segs.map(s => +s.cond.toFixed(3)), broken: p.segs.map((s, k) => s.broken ? k : -1).filter(k => k >= 0) })),
     dinos: dinos.map(d => ({ id: d.id, sp: d.sp, pen: d.pen, x: +d.x.toFixed(2), z: +d.z.toFixed(2), hunger: +d.hunger.toFixed(3), name: d.name, fedSkip: d.fedSkip, state: d.state === 'pen' ? 'pen' : 'holding' })),
     eggs };
@@ -1260,6 +1351,7 @@ window.__DP = {
   repair(penId){ const pen = pens.get(penId); for (const s of pen.segs){ s.cond = 1; s.broken = false; } releaseHeld(pen); rebuildFences(); showAlert(); },
   focus: focusOn, openSheet, closeSheet, setSpeed(s){ G.speed = s; }, setHour(h){ G.hour = h; }, setQuality, sim(sec){ let t = sec; while (t > 0){ const s = Math.min(t, 0.05); simulate(s); updateWild(s); t -= s; } }, tick(){ updateCamera(0.05); applyLighting(); renderer.render(scene, camera); },
   hourly(){ hourTick(); }, ready: false,
+  get tool(){ return tool; }, get camera(){ return camera; }, groundAt(x, y){ return groundAtScreen(x, y); }, get undo(){ return undoRec; }, startTool, undoLast, screenOf(i, j){ const v = new THREE.Vector3(tX(i), H(tX(i), tZ(j)), tZ(j)).project(camera); return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight]; }, tileType(i, j){ return tileType[idx(i, j)]; },
 };
 
 /* ================= init ================= */
