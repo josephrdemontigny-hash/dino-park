@@ -1111,7 +1111,7 @@ canvas.addEventListener('pointermove', (e) => {
   const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY; if (!gesture || title.on) return;
   if (Math.hypot(p.x - p.sx, p.y - p.sy) > 7) gesture.moved = true;
   if (gesture.kind === 'one'){ if (gesture.tool){ toolMove(p); return; } if (!gesture.moved) return; if (tool && tool.kind === 'bld'){ toolHover(tileAtScreen(p.x, p.y) || [0, 0]); }
-    cam.goal.yaw += dx * 0.0065; cam.goal.pitch = clamp(cam.goal.pitch + dy * 0.005, 0.1, 1.45); cam.follow = null; }
+    cam.goal.yaw -= dx * 0.0065; cam.goal.pitch = clamp(cam.goal.pitch + dy * 0.005, 0.1, 1.45); cam.follow = null; }
   else if (gesture.kind === 'pan'){ panBy(dx, dy); }
   else if (gesture.kind === 'two' && ptrs.size >= 2){ const n = pinchInfo(), l = gesture.last; panBy(n.cx - l.cx, n.cy - l.cy); if (l.d > 10) cam.goal.dist = clamp(cam.goal.dist * l.d / n.d, 12, 330); let da = n.ang - l.ang; if (da > Math.PI) da -= TAU; if (da < -Math.PI) da += TAU; cam.goal.yaw -= da; gesture.last = n; }
 });
