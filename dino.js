@@ -19,46 +19,51 @@ function cr(p0, p1, p2, p3, t){ const t2 = t * t, t3 = t2 * t; return 0.5 * ((2 
    legs: joints [dx, dy, dz, r] from 'at'; 5 joints for legs (hip, knee, ankle, ball, toe tip), 4 for arms. sx = lateral squash per joint. */
 const SPECIES = {
   trex: {
-    size: 12, gait: 'biped', scaleF: 1.25, teeth: [13, 12], toothL: 0.13,
-    nodes: [[-6.6,2.0,.03,.03,.03],[-5.8,2.25,.12,.14,.13],[-4.8,2.55,.23,.28,.27],[-3.7,2.86,.36,.44,.44],[-2.6,3.12,.5,.62,.64],[-1.4,3.32,.66,.82,.88],
-      [-.3,3.4,.8,.94,1.06],[.85,3.34,.9,.98,1.34],[1.9,3.36,.84,.9,1.24],[2.75,3.58,.64,.7,.92],[3.4,3.88,.5,.56,.66],[3.9,4.1,.46,.52,.54],
-      [4.3,4.22,.6,.54,.52],[4.8,4.18,.46,.5,.44],[5.25,4.06,.31,.47,.33],[5.6,3.96,.21,.38,.26],[5.86,3.9,.11,.22,.12]],
-    pel: 6, chest: 8, head: 11, headTaper: .32,
-    jaw: { hinge: [-.12, .3], pts: [[0,0,.47,.14,.42],[.42,-.1,.42,.13,.36],[.85,-.15,.33,.11,.27],[1.22,-.15,.23,.09,.19],[1.5,-.12,.1,.06,.08]] },
-    eye: { p: [.42, .34, .5], r: .068, gaze: [.74, .08, .67], pupil: 'slit', iris: '#c28a2c' },
+    size: 12, gait: 'biped', scaleF: 1.25, teeth: [12, 12], toothL: 0.15,
+    // v8: Sue-based proportions - shorter, deeper, boxier skull (wide behind the eyes, narrow snout), thick S-neck, hips ~38% back from the snout, long tail held level
+    nodes: [[-7.4,2.4,.03,.03,.03],[-6.4,2.62,.1,.12,.11],[-5.3,2.86,.19,.22,.23],[-4.15,3.1,.3,.35,.4],[-2.95,3.3,.43,.48,.6],[-1.7,3.44,.57,.58,.8],
+      [-.35,3.5,.7,.6,.98],[.85,3.42,.84,.54,1.18],[1.9,3.38,.8,.54,1.12],[2.7,3.56,.6,.52,.84],[3.25,3.95,.46,.44,.56],[3.72,4.3,.44,.44,.3],
+      [4.12,4.26,.5,.44,.3],[4.55,4.18,.34,.43,.27],[4.95,4.1,.26,.41,.25],[5.25,4.03,.21,.37,.22],[5.44,3.99,.16,.31,.19],[5.54,3.97,.08,.2,.12]],
+    pel: 6, chest: 8, head: 11, headTaper: .42,
+    jaw: { hinge: [-.28, .2], pts: [[0,0,.46,.12,.52],[.4,-.04,.41,.12,.45],[.8,-.06,.32,.11,.32],[1.15,-.04,.24,.1,.24],[1.48,-.02,.12,.07,.12]] },
+    eye: { p: [.39, .22, .42], r: .066, gaze: [.6, .08, .8], pupil: 'slit', iris: '#c28a2c' },
     legs: [
-      { hind: true, at: [.66, 3.16, .15], j: [[0,0,0,.74],[0,-1.45,.55,.48],[0,-2.42,-.3,.23],[0,-3.0,.12,.17],[0,-3.07,.86,.075]], sx: [.78,.82,.9,1.1,1.2],
-        thigh: [.06,-.45,.08, .52,.98,.78], calf: [0,-1.72,.12, .27,.46,.3], toes: { n: 3, spread: .36, len: [.82,1,.86] } },
-      { arm: true, at: [.46, 2.82, 2.5], j: [[0,0,0,.12],[.08,-.4,.12,.09],[.08,-.56,.42,.06],[.08,-.58,.6,.03]], sx: [1,1,1,1], fingers: 2 }],
+      { hind: true, at: [.66, 3.16, .15], j: [[0,0,0,.74],[0,-1.4,.58,.48],[0,-2.4,-.28,.23],[0,-3.0,.12,.17],[0,-3.07,.86,.075]], sx: [.78,.82,.9,1.1,1.2],
+        thigh: [.06,-.42,.04, .54,1.0,.86], calf: [0,-1.7,.14, .28,.48,.32], toes: { n: 3, spread: .36, len: [.82,1,.86] } },
+      { arm: true, at: [.5, 2.78, 2.42], j: [[0,0,0,.13],[.08,-.42,.14,.1],[.08,-.6,.44,.065],[.08,-.62,.62,.03]], sx: [1,1,1,1], fingers: 2 }],
     col: { top: 0x463f31, belly: 0xb09c78, mark: 0x221c14, pat: 1, patF: 2.4, mouth: 0x6e2a26, claw: 0x221d17 },
     feat(P, c){ const { H, hb } = c;
-      P.ell(hb, [.5, H[1] - .04, H[0] + .42], [.17, .2, .4], { k: .14, mirror: true });
-      P.ell(hb, [.4, H[1] + .24, H[0] + .06], [.2, .26, .3], { k: .12, mirror: true });
-      P.ell(hb, [.36, H[1] + .5, H[0] + .44], [.13, .09, .24], { k: .06, mirror: true });
-      P.ell(hb, [.26, H[1] + .55, H[0] + .76], [.08, .08, .13], { k: .05, mirror: true });
-      P.ell(hb, [0, H[1] + .43, H[0] + 1.2], [.15, .07, .5], { k: .1, rot: [.46, 0, 0] });
-      P.ell(hb, [.26, H[1] + .02, H[0] + 1.05], [.1, .11, .52], { k: .1, mirror: true });
-      P.sub(hb, [.46, H[1] + .34, H[0] + .5], [.1, .08, .1], { k: .03, mirror: true });
-      P.sub(hb, [.14, H[1] + .08, H[0] + 1.86], [.045, .035, .07], { k: .02, mirror: true });
+      P.ell(hb, [.44, H[1] - .14, H[0] + .36], [.14, .2, .3], { k: .14, mirror: true });
+      P.ell(hb, [.4, H[1] + .12, H[0] + .04], [.2, .26, .28], { k: .12, mirror: true });
+      P.ell(hb, [.36, H[1] + .34, H[0] + .36], [.13, .08, .18], { k: .06, mirror: true });
+      P.ell(hb, [.25, H[1] + .37, H[0] + .62], [.06, .05, .11], { k: .05, mirror: true });
+      P.ell(hb, [.36, H[1] - .3, H[0] + .02], [.16, .24, .26], { k: .12, mirror: true }); // jaw adductors fill the corner of the mouth
+      P.ell(hb, [0, H[1] + .3, H[0] + .9], [.11, .06, .45], { k: .12, rot: [.14, 0, 0] });
+      P.ell(hb, [.22, H[1] - .1, H[0] + 1.0], [.1, .12, .5], { k: .1, mirror: true });
+      P.sub(hb, [.42, H[1] + .22, H[0] + .42], [.1, .08, .1], { k: .03, mirror: true });
+      P.sub(hb, [.1, H[1] + .0, H[0] + 1.66], [.045, .035, .07], { k: .02, mirror: true });
+      // neck musculature: thick dorsal neck and throat so the head sits on an S-curved column, not a tube
+      P.ell(c.hb - 2, [0, 3.85, 3.05], [.38, .3, .55], { k: .25, rot: [-.75, 0, 0] });
     } },
   raptor: {
     size: 3.8, gait: 'biped', scaleF: 4, teeth: [11, 10], toothL: .028, quills: true,
     nodes: [[-2.3,.92,.02,.02,.02],[-1.9,.98,.045,.05,.05],[-1.45,1.02,.07,.08,.08],[-1.0,1.05,.1,.12,.12],[-.52,1.07,.14,.17,.17],
-      [0,1.08,.17,.2,.24],[.36,1.07,.19,.2,.27],[.7,1.1,.16,.16,.21],[.95,1.23,.15,.15,.17],[1.08,1.41,.125,.13,.135],[1.17,1.555,.104,.108,.088],
-      [1.3,1.6,.085,.09,.052],[1.46,1.585,.068,.075,.044],[1.6,1.555,.05,.056,.036],[1.72,1.53,.022,.03,.02]],
+      [0,1.08,.17,.2,.24],[.36,1.07,.19,.2,.27],[.7,1.1,.16,.16,.21],[.95,1.23,.15,.15,.17],[1.08,1.41,.125,.13,.135],[1.17,1.57,.108,.13,.105],
+      [1.28,1.605,.092,.125,.08],[1.4,1.59,.074,.11,.065],[1.51,1.565,.055,.09,.05],[1.6,1.545,.03,.055,.032]],
     pel: 5, chest: 7, head: 10,
-    jaw: { hinge: [-.035, .07], pts: [[0,0,.075,.03,.045],[.17,-.01,.062,.028,.034],[.33,-.016,.044,.024,.024],[.45,-.016,.02,.016,.012]] },
-    eye: { p: [.068, .045, .13], r: .02, gaze: [.9, .05, .42], pupil: 'round', iris: '#d8a22a' },
+    jaw: { hinge: [-.05, .07], pts: [[0,0,.075,.03,.056],[.15,-.008,.062,.028,.044],[.28,-.014,.044,.024,.03],[.38,-.014,.02,.016,.013]] },
+    eye: { p: [.07, .05, .1], r: .022, gaze: [.85, .05, .52], pupil: 'round', iris: '#d8a22a' },
     legs: [
       { hind: true, at: [.15, .99, .02], j: [[0,0,0,.16],[0,-.38,.15,.085],[0,-.75,-.13,.042],[0,-.95,.04,.035],[0,-.98,.2,.016]], sx: [.75,.8,.9,1.1,1.2],
         thigh: [.02,-.12,.03, .12,.22,.17], calf: [0,-.5,.06, .055,.12,.07], toes: { n: 2, spread: .12, len: [1, .9] }, sickle: true },
-      { arm: true, at: [.12, .99, .74], j: [[0,0,0,.045],[0,-.17,-.07,.03],[0,-.28,.13,.022],[0,-.31,.26,.01]], sx: [1,1,1,1], fingers: 3 }],
+      { arm: true, at: [.12, 1.0, .74], j: [[0,0,0,.05],[.02,-.2,-.13,.034],[.03,-.3,.07,.024],[.03,-.36,.3,.012]], sx: [1,1,1,1], fingers: 3 }],
     col: { top: 0x8a7550, belly: 0xd2c29c, mark: 0x3a2b1b, pat: 3, patF: 1.6, mouth: 0x6e2a26, claw: 0x1c1712 },
     feat(P, c){ const { H, hb } = c;
       P.ell(hb, [.06, H[1] + .055, H[0] + .1], [.035, .03, .07], { k: .02, mirror: true });
       P.ell(hb, [.055, H[1] + .07, H[0] + .14], [.03, .015, .05], { k: .015, mirror: true });
       P.sub(hb, [.075, H[1] + .045, H[0] + .13], [.026, .022, .026], { k: .008, mirror: true });
-      P.sub(hb, [.022, H[1] + .015, H[0] + .52], [.012, .008, .018], { k: .005, mirror: true });
+      P.sub(hb, [.022, H[1] + .015, H[0] + .4], [.012, .008, .018], { k: .005, mirror: true });
+      P.ell(hb, [.05, H[1] + .075, H[0] + .06], [.04, .025, .07], { k: .02, mirror: true }); // v8: heavier brow over a deeper, shorter skull
     } },
   dilo: {
     size: 6.5, gait: 'biped', scaleF: 2.4, teeth: [11, 10], toothL: .045,
@@ -71,64 +76,69 @@ const SPECIES = {
     legs: [
       { hind: true, at: [.24, 1.6, .03], j: [[0,0,0,.25],[0,-.62,.24,.13],[0,-1.2,-.2,.065],[0,-1.53,.05,.055],[0,-1.58,.36,.025]], sx: [.76,.8,.9,1.1,1.2],
         thigh: [.03,-.2,.04, .19,.36,.28], calf: [0,-.8,.08, .09,.18,.1], toes: { n: 3, spread: .34, len: [.8,1,.85] } },
-      { arm: true, at: [.18, 1.56, 1.15], j: [[0,0,0,.07],[0,-.26,-.1,.05],[0,-.44,.18,.035],[0,-.49,.32,.015]], sx: [1,1,1,1], fingers: 3 }],
+      { arm: true, at: [.18, 1.58, 1.12], j: [[0,0,0,.075],[.02,-.32,-.16,.052],[.03,-.5,.12,.036],[.03,-.58,.4,.016]], sx: [1,1,1,1], fingers: 3 }],
     col: { top: 0x58653f, belly: 0xc4b98c, mark: 0x283019, pat: 2, patF: 1.4, mouth: 0x6e2a26, crest: 0xb44a26, claw: 0x221d17 },
     feat(P, c){ const { H, hb } = c;
       P.ell(hb, [.085, H[1] + .07, H[0] + .1], [.05, .05, .1], { k: .03, mirror: true });
       P.sub(hb, [.11, H[1] + .06, H[0] + .17], [.034, .03, .034], { k: .01, mirror: true });
       P.sub(hb, [.03, H[1] + .02, H[0] + .6], [.014, .01, .02], { k: .006, mirror: true });
       P.sub(hb, [.07, H[1] - .05, H[0] + .42], [.03, .025, .03], { k: .02, mirror: true });
+      P.sub(hb, [0, H[1] - .075, H[0] + .5], [.08, .022, .035], { k: .012 }); // subnarial notch: the kink between premaxilla and maxilla
     } },
   trike: {
     size: 9, gait: 'quad', trot: 1, scaleF: 1.4,
-    nodes: [[-4.6,1.55,.05,.05,.05],[-3.8,1.8,.17,.2,.2],[-2.8,2.1,.34,.4,.4],[-1.8,2.38,.56,.6,.65],[-.8,2.62,.84,.78,.88],
-      [.1,2.76,1.04,.8,1.08],[1.1,2.7,1.16,.78,1.16],[2.05,2.46,1.06,.72,1.06],[2.85,2.14,.78,.58,.76],[3.4,1.94,.55,.5,.5],
-      [3.85,1.88,.5,.6,.44],[4.3,1.8,.42,.58,.42],[4.72,1.62,.3,.48,.36],[5.02,1.42,.18,.32,.26],[5.18,1.26,.07,.12,.1]],
+    // v8: skull ~1/3 of the animal (frill included), solid frill sweeping up and back over the neck, long brow horns pointing forward,
+    // barrel body with the high point over the hips, shorter tail held clear of the ground, sprawled elbows
+    nodes: [[-3.05,1.4,.05,.05,.05],[-2.45,1.66,.14,.16,.16],[-1.75,1.96,.27,.3,.33],[-1.0,2.22,.46,.45,.54],[-.35,2.38,.76,.58,.8],
+      [.3,2.45,1.0,.56,1.0],[1.2,2.36,1.12,.54,1.1],[2.1,2.12,1.0,.48,.98],[2.75,1.82,.7,.38,.64],
+      [3.2,1.86,.5,.46,.48],[3.7,1.86,.54,.6,.52],[4.2,1.74,.45,.56,.46],[4.65,1.56,.33,.5,.4],[5.0,1.36,.21,.38,.29],[5.2,1.18,.09,.17,.12]],
     pel: 5, chest: 7, head: 9,
-    jaw: { hinge: [-.3, .7], pts: [[0,0,.34,.1,.28],[.45,-.1,.28,.09,.24],[.85,-.22,.17,.07,.15],[1.12,-.32,.06,.04,.06]] },
-    eye: { p: [.38, .3, .55], r: .055, gaze: [.95, .1, .3], pupil: 'round', iris: '#5a3a1c' },
+    frillP: { base: [0, .38, .3], w: 1.32, h: 1.42, top: [1.0, -1.15], low: [-.62, .3], bulge: [.5, .32], dome: .15, th: .06 },
+    jaw: { hinge: [-.33, .55], pts: [[0,0,.36,.1,.36],[.45,-.12,.3,.09,.32],[.85,-.26,.2,.08,.22],[1.2,-.38,.1,.05,.1]] },
+    eye: { p: [.43, .3, .62], r: .055, gaze: [.95, .1, .3], pupil: 'round', iris: '#5a3a1c' },
     legs: [
-      { hind: true, at: [.84, 2.25, .1], j: [[0,0,0,.52],[0,-1.05,.22,.32],[0,-1.86,-.05,.22],[0,-2.15,.08,.25],[0,-2.22,.38,.12]], sx: [.8,.85,.95,1.15,1.3],
-        thigh: [.05,-.35,.05, .44,.8,.62], calf: [0,-1.3,.02, .26,.4,.28], toes: { n: 3, spread: .3, len: [.9,1,.9], hoof: true } },
-      { front: true, at: [.82, 1.78, 2.65], j: [[0,0,0,.4],[.14,-.75,-.12,.28],[.14,-1.45,.06,.2],[.14,-1.74,.1,.22],[.14,-1.8,.34,.11]], sx: [.85,.9,.95,1.15,1.3],
-        thigh: [.06,-.28,0, .36,.58,.46], toes: { n: 4, spread: .26, len: [.8,1,1,.8], hoof: true } }],
+      { hind: true, at: [.82, 2.1, .3], j: [[0,0,0,.52],[0,-.98,.24,.32],[0,-1.74,-.04,.22],[0,-2.03,.08,.25],[0,-2.1,.38,.12]], sx: [.8,.85,.95,1.15,1.3],
+        thigh: [.05,-.33,.05, .46,.8,.64], calf: [0,-1.22,.02, .26,.4,.28], toes: { n: 3, spread: .3, len: [.9,1,.9], hoof: true } },
+      { front: true, at: [.84, 1.58, 2.3], j: [[0,0,0,.38],[.2,-.62,-.14,.27],[.2,-1.24,.04,.2],[.2,-1.5,.08,.22],[.2,-1.58,.32,.11]], sx: [.85,.9,.95,1.15,1.3],
+        thigh: [.08,-.26,0, .36,.56,.46], toes: { n: 4, spread: .26, len: [.8,1,1,.8], hoof: true } }],
     col: { top: 0x5a5340, belly: 0xa89a76, mark: 0x3a3426, pat: 2, patF: 1.0, mouth: 0x6e3a30, frill: 0x7a4c30, horn: 0xe0d4b6, beak: 0x2a241c, claw: 0x2a241c },
     feat(P, c){ const { H, hb, F } = c;
-      P.ell(hb, [.34, H[1] + .3, H[0] + .52], [.1, .07, .18], { k: .06, mirror: true });
-      P.ell(hb, [.42, H[1] - .02, H[0] + .45], [.16, .2, .26], { k: .1, mirror: true });
-      P.ell(hb, [.46, H[1] - .12, H[0] + .3], [.1, .1, .12], { k: .05, mirror: true, reg: F.horn });
-      P.sub(hb, [.44, H[1] + .3, H[0] + .55], [.075, .065, .075], { k: .02, mirror: true });
-      P.sub(hb, [.13, H[1] + .02, H[0] + 1.3], [.07, .07, .1], { k: .03, mirror: true });
-      P.cone(hb, hb, [0, H[1] - .1, H[0] + 1.5], [0, H[1] - .6, H[0] + 1.86], .16, .035, { k: .04, sx: .62, reg: F.beak });
-      P.frill(hb, [0, H[1] + .3, H[0] - .05], 1.3, 1.25, .12, -.62, F.frill);
-      P.ell(hb, [.27, H[1] + .42, H[0] + .48], [.13, .13, .13], { k: .06, mirror: true });
-      P.ell(hb, [0, H[1] + .16, H[0] + 1.15], [.1, .1, .14], { k: .06 });
+      P.ell(hb, [.36, H[1] + .44, H[0] + .6], [.11, .08, .2], { k: .06, mirror: true });
+      P.ell(hb, [.46, H[1] - .06, H[0] + .55], [.18, .24, .3], { k: .1, mirror: true });
+      P.ell(hb, [.53, H[1] - .22, H[0] + .42], [.1, .12, .12], { k: .05, mirror: true, reg: F.horn });
+      P.sub(hb, [.45, H[1] + .3, H[0] + .62], [.075, .065, .075], { k: .02, mirror: true });
+      P.sub(hb, [.15, H[1] - .04, H[0] + 1.6], [.08, .09, .14], { k: .03, mirror: true });
+      P.cone(hb, hb, [0, H[1] - .45, H[0] + 1.68], [0, H[1] - .92, H[0] + 2.08], .16, .035, { k: .04, sx: .62, reg: F.beak });
+      P.ell(hb, [.3, H[1] + .52, H[0] + .6], [.13, .13, .13], { k: .06, mirror: true });
+      P.ell(hb, [0, H[1] + .1, H[0] + 1.45], [.1, .1, .16], { k: .06 });
+      P.ell(hb, [0, H[1] + .38, H[0] + .1], [.36, .26, .3], { k: .12 }); // frill root / neck shield muscle
     } },
   brachio: {
     size: 18, gait: 'quad', trot: 0, scaleF: .9,
-    nodes: [[-8.4,2.6,.07,.07,.07],[-7.2,3.1,.24,.25,.25],[-5.8,3.6,.44,.45,.45],[-4.3,4.1,.7,.72,.72],[-2.6,4.55,1.05,1.0,1.08],
-      [-.8,4.82,1.34,1.12,1.42],[1.0,5.1,1.48,1.16,1.6],[2.7,5.6,1.38,1.06,1.5],[4.1,6.25,1.0,.9,1.08],[5.1,7.2,.66,.68,.72],[5.8,8.3,.5,.52,.54],
-      [6.4,9.5,.4,.42,.43],[6.9,10.6,.33,.35,.35],[7.25,11.42,.29,.3,.3],
-      [7.62,11.62,.32,.4,.26],[8.0,11.52,.29,.32,.22],[8.38,11.36,.21,.24,.16],[8.66,11.24,.09,.11,.07]],
+    // v8 (after Taylor 2009 / Hartman): long trunk, withers clearly higher than the hips so the back slopes down to the tail,
+    // neck raised ~50 deg from tall shoulders, long tapering tail held level, small head with the tall nasal arch in front of the eyes
+    nodes: [[-9.3,2.08,.08,.08,.08],[-8,2.47,.15,.16,.16],[-6.6,2.95,.26,.28,.3],[-5.2,3.4,.42,.44,.5],[-3.6,3.8,.7,.62,.8],[-1.7,4.07,1.1,.62,1.25],[0,4.33,1.35,.68,1.6],[1.7,4.75,1.3,.7,1.8],[2.9,5.25,.9,.72,1],[3.7,6.3,.62,.58,.66],[4.5,7.6,.46,.46,.48],[5.28,8.9,.37,.37,.38],[6.05,10.15,.3,.31,.31],[6.62,10.95,.27,.28,.28],[6.95,11.17,.3,.38,.24],[7.29,11.11,.28,.31,.2],[7.62,10.95,.2,.23,.15],[7.87,10.83,.09,.11,.07]],
     pel: 5, chest: 7, head: 13, sleepNeck: 1.75, sleepHead: .55, sleepCurl: 1.3, sleepFoot: 1,
-    jaw: { hinge: [-.02, .4], pts: [[0,0,.25,.08,.15],[.42,-.12,.22,.07,.12],[.8,-.24,.17,.06,.09],[1.02,-.3,.08,.035,.045]] },
-    eye: { p: [.3, .3, .42], r: .06, gaze: [.95, .1, .3], pupil: 'round', iris: '#4a3218' },
+    jaw: { hinge: [-.1, .3], pts: [[0,0,.25,.08,.15],[.4,-.1,.22,.07,.12],[.76,-.2,.17,.06,.09],[1.0,-.26,.08,.035,.045]] },
+    eye: { p: [.27, .26, .24], r: .06, gaze: [.95, .1, .3], pupil: 'round', iris: '#4a3218' },
     legs: [
-      { hind: true, at: [1.05, 4.25, -.6], j: [[0,0,0,.9],[0,-2.1,.3,.55],[0,-3.7,-.05,.4],[0,-4.12,.1,.44],[0,-4.22,.42,.2]], sx: [.82,.9,1,1.15,1.3],
-        thigh: [.05,-.7,.1, .72,1.4,1.0], toes: { n: 3, spread: .3, len: [.9,1,.9], hoof: true } },
-      { front: true, at: [1.15, 5.05, 3.6], j: [[0,0,0,.78],[0,-2.4,-.25,.5],[0,-4.4,.05,.36],[0,-4.92,.1,.4],[0,-5.02,.36,.18]], sx: [.85,.9,1,1.15,1.3],
-        thigh: [.05,-.6,0, .66,1.1,.8], toes: { n: 1, spread: 0, len: [1], hoof: true } }],
+      { hind: true, at: [1.0, 3.75, -1.6], j: [[0,0,0,.75],[0,-1.82,.28,.47],[0,-3.3,-.05,.33],[0,-3.66,.08,.37],[0,-3.75,.36,.18]], sx: [.82,.9,1,1.15,1.3],
+        thigh: [.05,-.55,.1, .65,1.15,.9], toes: { n: 3, spread: .3, len: [.9,1,.9], hoof: true } },
+      { front: true, at: [1.08, 4.35, 1.9], j: [[0,0,0,.66],[0,-2.12,-.22,.42],[0,-3.82,.04,.29],[0,-4.26,.08,.33],[0,-4.35,.3,.15]], sx: [.85,.9,1,1.15,1.3],
+        thigh: [.05,-.55,0, .56,1.0,.72], toes: { n: 1, spread: 0, len: [1], hoof: true } }],
     col: { top: 0x5e6454, belly: 0xa2a08c, mark: 0x3e4438, pat: 0, patF: .7, mouth: 0x6e3a30, claw: 0x2a241c },
     feat(P, c){ const { H, hb } = c;
-      P.ell(hb, [0, H[1] + .5, H[0] + .4], [.22, .26, .32], { k: .14 });
-      P.ell(hb, [.26, H[1] + .38, H[0] + .42], [.08, .06, .14], { k: .05, mirror: true });
-      P.sub(hb, [.32, H[1] + .3, H[0] + .42], [.075, .065, .075], { k: .02, mirror: true });
-      P.sub(hb, [.1, H[1] + .7, H[0] + .4], [.06, .05, .08], { k: .03, mirror: true });
+      P.ell(hb, [0, H[1] + .42, H[0] + .4], [.23, .28, .3], { k: .14 });
+      P.ell(hb, [.24, H[1] + .3, H[0] + .26], [.08, .06, .14], { k: .05, mirror: true });
+      P.sub(hb, [.3, H[1] + .26, H[0] + .24], [.075, .065, .075], { k: .02, mirror: true });
+      P.sub(hb, [.1, H[1] + .62, H[0] + .48], [.06, .05, .08], { k: .03, mirror: true });
+      P.ell(c.hb - 5, [0, 5.65, 3.2], [.62, .6, .85], { k: .4, rot: [-.8, 0, 0] }); // neck base muscle
     } },
   stego: {
     size: 8, gait: 'quad', trot: .4, scaleF: 1.5,
-    nodes: [[-4.3,1.45,.05,.05,.05],[-3.5,1.8,.15,.17,.17],[-2.5,2.15,.3,.33,.33],[-1.4,2.45,.52,.55,.58],[-.3,2.66,.74,.76,.84],
-      [.6,2.62,.84,.8,.96],[1.5,2.35,.8,.72,.9],[2.3,1.85,.64,.56,.68],[2.9,1.38,.4,.38,.4],[3.32,1.08,.22,.22,.22],
+    // v8: back peaks over the hips, tail carried level off the ground, short neck sloping down to a small low head
+    nodes: [[-4.3,1.75,.05,.05,.05],[-3.45,2.0,.15,.17,.17],[-2.5,2.28,.3,.33,.34],[-1.4,2.52,.52,.55,.6],[-.3,2.68,.74,.74,.86],
+      [.6,2.6,.84,.76,.98],[1.5,2.32,.8,.7,.92],[2.3,1.85,.64,.56,.68],[2.9,1.38,.4,.38,.4],[3.32,1.08,.22,.22,.22],
       [3.6,.93,.17,.18,.12],[3.86,.86,.15,.14,.1],[4.1,.8,.1,.09,.07],[4.26,.76,.04,.045,.04]],
     pel: 4, chest: 6, head: 10,
     jaw: { hinge: [-.08, .06], pts: [[0,0,.12,.03,.07],[.26,-.03,.1,.03,.06],[.5,-.05,.07,.02,.04],[.64,-.05,.03,.012,.016]] },
@@ -162,31 +172,32 @@ const SPECIES = {
       P.ell(hb, [.15, H[1] + .1, H[0] + .1], [.06, .04, .1], { k: .03, mirror: true });
       P.sub(hb, [.19, H[1] + .1, H[0] + .2], [.045, .04, .045], { k: .015, mirror: true });
       P.sub(hb, [.06, H[1] + .02, H[0] + .74], [.03, .02, .06], { k: .01, mirror: true });
-      const cp = []; for (let i = 0; i <= 6; i++){ const t = i / 6; cp.push([0, H[1] + .16 + t * .42 + Math.sin(t * 2.2) * .05, H[0] + .45 - t * 1.25]); }
-      for (let i = 0; i < 6; i++) P.cone(hb, hb, cp[i], cp[i + 1], lerp(.1, .085, i / 6), lerp(.1, .085, (i + 1) / 6), { k: .1, sx: .75, reg: F.crest, g: 'crest' });
+      P.cone(hb, hb, [0, H[1] + .12, H[0] + .55], [0, H[1] + .3, H[0] + .05], .09, .1, { k: .1, sx: .75, reg: F.crest, g: 'crest' }); // crest root, blended into the skull
     } },
   ankylo: {
     size: 7, gait: 'quad', trot: .3, scaleF: 1.6, square: true, osteo: true,
-    nodes: [[-3.9,.95,.08,.08,.08],[-3.3,1.0,.11,.12,.12],[-2.6,1.12,.2,.2,.2],[-1.8,1.28,.42,.36,.38],
-      [-.8,1.5,.9,.58,.58],[.3,1.6,1.28,.66,.7],[1.35,1.55,1.3,.62,.72],[2.3,1.4,1.02,.55,.6],[2.9,1.2,.6,.4,.4],
-      [3.25,1.08,.46,.33,.3],[3.6,1.0,.43,.29,.24],[3.9,.92,.33,.23,.18],[4.08,.86,.14,.11,.08]],
+    // v8: much broader, flatter body, short stiff tail held straight off the ground ending in a wide bony club, broad triangular head
+    nodes: [[-3.45,1.0,.08,.08,.08],[-2.95,1.05,.1,.11,.11],[-2.35,1.14,.19,.19,.19],[-1.65,1.3,.46,.4,.4],
+      [-.7,1.5,1.05,.68,.62],[.35,1.6,1.45,.74,.72],[1.4,1.56,1.48,.7,.74],[2.3,1.42,1.12,.58,.62],[2.9,1.22,.64,.42,.42],
+      [3.25,1.1,.66,.38,.32],[3.6,1.02,.62,.33,.26],[3.9,.94,.48,.26,.19],[4.08,.88,.2,.13,.08]],
     pel: 4, chest: 6, head: 9,
     jaw: { hinge: [-.12, .12], pts: [[0,0,.3,.06,.12],[.3,-.04,.27,.05,.1],[.56,-.06,.18,.04,.06],[.7,-.06,.08,.02,.03]] },
     eye: { p: [.33, .1, .14], r: .036, gaze: [.95, .1, .3], pupil: 'round', iris: '#4a3218' },
     legs: [
-      { hind: true, at: [.82, 1.22, -.3], j: [[0,0,0,.4],[.05,-.6,.15,.27],[.08,-1.0,-.02,.19],[.08,-1.17,.06,.21],[.08,-1.23,.3,.1]], sx: [.85,.9,.95,1.15,1.3],
+      { hind: true, at: [.82, 1.22, -.3], j: [[0,0,0,.44],[.05,-.6,.15,.31],[.08,-1.0,-.02,.23],[.08,-1.17,.06,.24],[.08,-1.23,.3,.12]], sx: [.85,.9,.95,1.15,1.3],
         thigh: [.04,-.15,0, .34,.42,.4], toes: { n: 3, spread: .3, len: [.9,1,.9], hoof: true } },
-      { front: true, at: [.82, 1.06, 2.3], j: [[0,0,0,.32],[.08,-.5,-.06,.22],[.12,-.86,.04,.16],[.12,-1.02,.06,.18],[.12,-1.07,.26,.09]], sx: [.9,.95,1,1.15,1.3],
+      { front: true, at: [.82, 1.06, 2.3], j: [[0,0,0,.36],[.1,-.5,-.06,.26],[.14,-.86,.04,.2],[.14,-1.02,.06,.21],[.14,-1.07,.26,.1]], sx: [.9,.95,1,1.15,1.3],
         thigh: [.04,-.12,0, .26,.32,.3], toes: { n: 4, spread: .26, len: [.8,1,1,.8], hoof: true } }],
-    col: { top: 0x5a5242, belly: 0x948b72, mark: 0x37322a, pat: 0, patF: 1, mouth: 0x6e3a30, osteo: 0x6e6450, horn: 0xb8a988, beak: 0x2a241c, claw: 0x2a241c },
+    col: { top: 0x5a5242, belly: 0x948b72, mark: 0x37322a, pat: 0, patF: 1, mouth: 0x6e3a30, osteo: 0x8c7f62, horn: 0xb8a988, beak: 0x2a241c, claw: 0x2a241c },
     feat(P, c){ const { H, hb, F } = c;
       for (const sd of [1, -1]){
-        P.cone(hb, hb, [sd * .34, H[1] + .2, H[0] + .1], [sd * .5, H[1] + .26, H[0] - .12], .09, .02, { k: .05, reg: F.horn });
-        P.cone(hb, hb, [sd * .34, H[1] - .08, H[0] + .12], [sd * .5, H[1] - .2, H[0] - .04], .08, .02, { k: .05, reg: F.horn }); }
-      P.ell(hb, [.3, H[1] + .2, H[0] + .2], [.08, .05, .1], { k: .04, mirror: true });
-      P.sub(hb, [.35, H[1] + .1, H[0] + .14], [.045, .04, .045], { k: .015, mirror: true });
+        P.cone(hb, hb, [sd * .4, H[1] + .2, H[0] + .1], [sd * .6, H[1] + .26, H[0] - .16], .1, .02, { k: .05, reg: F.horn });
+        P.cone(hb, hb, [sd * .4, H[1] - .08, H[0] + .12], [sd * .6, H[1] - .22, H[0] - .06], .09, .02, { k: .05, reg: F.horn }); }
+      P.ell(hb, [.34, H[1] + .2, H[0] + .2], [.08, .05, .1], { k: .04, mirror: true });
+      P.sub(hb, [.4, H[1] + .1, H[0] + .14], [.045, .04, .045], { k: .015, mirror: true });
       P.sub(hb, [.12, H[1] + .02, H[0] + .9], [.05, .04, .06], { k: .02, mirror: true });
       P.cone(hb, hb, [0, H[1] - .08, H[0] + .86], [0, H[1] - .14, H[0] + .98], .1, .04, { k: .04, sx: 1.5, reg: F.beak });
+      P.ell(hb, [0, H[1] + .18, H[0] + .25], [.44, .12, .35], { k: .08 }); // flat armoured skull roof
     } },
 };
 
@@ -434,12 +445,14 @@ function buildSpecies(key){
     };
     S.feat(P, { H, hb, F, sz });
     if (S.osteo){ const g = B.group('add', .018 * sz); const r = mulberry(5);
-      for (let i = 0; i < 150; i++){ const s = 1.6 + r() * (S.head - 1.9); const sp = atS(s); const a = (r() - .5) * 2.7; const ca = Math.cos(a), sa = Math.sin(a);
-        const rr = (.06 + r() * .07) * (s > S.pel - 1 && s < S.chest + 1 ? 1.3 : .8);
-        B.push(g, B.ellp(owner(Math.floor(s)), [sa * sp[2] * .97, sp[1] + ca * sp[3] * .96, sp[0]], [rr, rr * .55, rr * 1.15], { reg: F.osteo }), margin); }
+      // v8: osteoderms in transverse bands (as preserved in Ankylosaurus/Euoplocephalus), largest over the hips, not a random scatter
+      let row = 0; for (let s = 1.5; s < S.head - .25; s += .36, row++){ const sp = atS(s); const big = s > S.pel - 1 && s < S.chest + 1 ? 1.25 : .85; const nA = s < S.pel - 1.5 || s > S.chest + .6 ? 4 : 6;
+        for (let q = 0; q < nA; q++){ const a = ((q + .5) / nA - .5) * 2.5 + (row % 2 ? .12 : -.12) + (r() - .5) * .08; const ca = Math.cos(a), sa = Math.sin(a);
+          const rr = (.1 + r() * .025) * big * (1 - Math.abs(a) * .18);
+          B.push(g, B.ellp(owner(Math.floor(s)), [sa * sp[2] * 1.0, sp[1] + ca * sp[3] * 1.0, sp[0]], [rr, rr * .55, rr * 1.25], { reg: F.osteo }), margin); } }
       const t0 = samples[1], cb = owner(0);
-      B.push(g, B.ellp(cb, [.2, t0[1], t0[0]], [.26, .17, .32], { reg: F.osteo }), margin); B.push(g, B.ellp(cb, [-.2, t0[1], t0[0]], [.26, .17, .32], { reg: F.osteo }), margin);
-      B.push(g, B.ellp(cb, [0, t0[1] + .02, t0[0] + .1], [.2, .15, .28], { reg: F.osteo }), margin); }
+      B.push(g, B.ellp(cb, [.24, t0[1], t0[0]], [.33, .19, .38], { reg: F.osteo }), margin); B.push(g, B.ellp(cb, [-.24, t0[1], t0[0]], [.33, .19, .38], { reg: F.osteo }), margin);
+      B.push(g, B.ellp(cb, [0, t0[1] + .02, t0[0] + .1], [.24, .17, .32], { reg: F.osteo }), margin); }
     return B;
   };
   const makeJaw = (cell) => { const B = new Builder(); const g = B.group('add', 0); g.spine = true;
@@ -524,7 +537,7 @@ function buildExtras(S, c){
   const ivory = new THREE.Color(0xeee6cf), stain = new THREE.Color(0xb09a70);
   if (S.teeth){ const [nu, nl] = S.teeth; const tip = N[N.length - 1][0]; const z0 = hinge[2] + .12 * sz, z1 = tip - .025 * S.size / 4;
     for (const sd of [1, -1]){
-      for (let i = 0; i < nu; i++){ const t = i / (nu - 1); const z = lerp(z0, z1, t); const sp = spineAt(z); const yl = sp[1] - sp[4] * .8; const xl = sp[2] * .6 * .97;
+      for (let i = 0; i < nu; i++){ const t = i / (nu - 1); const z = lerp(z0, z1, t); const sp = spineAt(z); const yl = sp[1] - sp[4] * .93; /* v8: tooth tips just show below the lip line */ const xl = sp[2] * .6 * .97;
         const L = S.toothL * (1.1 - Math.abs(t - .35) * .7);
         hi.push(rigid(place(curvedCone(L, L * .2, -.25, 5, 3), [sd * xl, yl + L * .62, z], [0, -1, 0], [0, 0, 1]), 0xffffff, hb, .3, (v) => ivory.clone().lerp(stain, clamp((v.y - (yl - L * .6)) / L, 0, 1)))); }
       const J = S.jaw.pts, jl = J[J.length - 1][0];
@@ -538,27 +551,51 @@ function buildExtras(S, c){
       const cg = rigid(g, claw, li.arm ? li.bones[2] : fb, .35); hi.push(cg); if (S.size >= 7) lo.push(cg); } // small species: far mesh toes are too thin to hold claws
     if (li.L.sickle){ const g = curvedCone(.1, .018, -1.0, 6, 5); place(g, [ball[0] - li.side * .012, ball[1] + .03, ball[2] + .01], [0, .7, .7], [0, .3, 1]); hi.push(rigid(g, claw, fb, .3)); } }
   if (S.key === 'trike'){ const hcol = (v) => new THREE.Color(S.col.horn).lerp(new THREE.Color(0x3a3024), clamp((v.y - H[1] - .8) * .9, 0, 1) * .7);
-    for (const sd of [1, -1]){ const g = curvedCone(1.05, .12, .22, 10, 6); place(g, [sd * .27, H[1] + .48, H[0] + .48], [sd * .12, .62, .78], [0, 1, -.2]); both(rigid(g, S.col.horn, hb, .4, hcol)); }
-    const g = curvedCone(.38, .1, .12, 10, 4); place(g, [0, H[1] + .22, H[0] + 1.15], [0, .9, .44], [0, 0, 1]); both(rigid(g, S.col.horn, hb, .4, hcol));
-    const tilt = -.62, base = [0, H[1] + .3, H[0] - .05], w = 1.3, h = 1.25;
-    for (let i = 0; i <= 14; i++){ const a = -.15 + (Math.PI + .3) * i / 14; const ex2 = Math.cos(a) * w * .97, ey = Math.sin(a) * h * .55 * .97;
-      const cy = base[1] + h * .45 * Math.cos(tilt) + ey * Math.cos(tilt), cz = base[2] + h * .45 * Math.sin(tilt) + ey * Math.sin(tilt);
-      const g2 = curvedCone(.17, .075, 0, 6, 2); place(g2, [ex2, cy, cz], [Math.cos(a), Math.sin(a) * Math.cos(tilt), Math.sin(a) * Math.sin(tilt)], [0, -Math.sin(tilt), Math.cos(tilt)]); both(rigid(g2, 0xcfc3a3, hb, .5)); } }
+    for (const sd of [1, -1]){ const g = curvedCone(1.1, .13, .16, 10, 6); place(g, [sd * .3, H[1] + .56, H[0] + .6], [sd * .14, .5, .86], [0, 1, -.1]); both(rigid(g, S.col.horn, hb, .4, hcol)); }
+    const g = curvedCone(.34, .1, .12, 10, 4); place(g, [0, H[1] + .14, H[0] + 1.45], [0, .88, .48], [0, 0, 1]); both(rigid(g, S.col.horn, hb, .4, hcol));
+    // v8 frill: a cupped bony shield, rising up and back from behind the brow horns; its sides curl forward and down to the cheeks,
+    // so from the side it reads as the big fan behind the eye rather than a thin blade
+    const fp = S.frillP, B0 = new THREE.Vector3(0, H[1] + fp.base[1], H[0] + fp.base[2]);
+    // rim(phi): top-centre (phi=0) round to the squamosal behind the eye (phi=90deg); widest about two-thirds of the way down
+    const rim = (a, out) => { const sd = a < 0 ? -1 : 1, t = Math.min(1, Math.abs(a)), ph = t * Math.PI / 2, c0 = Math.cos(ph), s0 = Math.sin(ph), s2 = Math.sin(2 * ph);
+      return out.set(sd * fp.w * s0 * (1 - .45 * ss(.7, 1, t)), B0.y + fp.top[0] * c0 + fp.low[0] * s0 + fp.bulge[0] * s2, B0.z + fp.top[1] * c0 + fp.low[1] * s0 + fp.bulge[1] * s2); };
+    const NA = 28, NV = 7, pos = [], ix = [], tv = new THREE.Vector3(), rv = new THREE.Vector3();
+    for (let j = 0; j <= NV; j++) for (let i = 0; i <= NA; i++){ const v = .05 + .95 * j / NV; rim(-1 + 2 * i / NA, rv); tv.copy(B0).lerp(rv, v); tv.y += fp.dome * v * (1 - v); pos.push(tv.x, tv.y, tv.z); }
+    for (let j = 0; j < NV; j++) for (let i = 0; i < NA; i++){ const q = j * (NA + 1) + i, r = q + NA + 1; ix.push(q, q + 1, r, q + 1, r + 1, r); }
+    const one = new THREE.BufferGeometry(); one.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); one.setIndex(ix); one.computeVertexNormals();
+    { const n = one.attributes.normal; const i0 = Math.floor(NV / 2) * (NA + 1) + Math.floor(NA / 2); if (n.getZ(i0) + n.getY(i0) < 0){ for (let t = 0; t < ix.length; t += 3){ const s2 = ix[t + 1]; ix[t + 1] = ix[t + 2]; ix[t + 2] = s2; } one.setIndex(ix); one.computeVertexNormals(); } }
+    const nv = pos.length / 3, nrm = one.attributes.normal, pos2 = pos.slice(), ix2 = ix.slice();
+    for (let k = 0; k < nv; k++){ const th = fp.th * (1.6 - .6 * Math.floor(k / (NA + 1)) / NV); pos2.push(pos[k * 3] - nrm.getX(k) * th, pos[k * 3 + 1] - nrm.getY(k) * th, pos[k * 3 + 2] - nrm.getZ(k) * th); }
+    for (let t = 0; t < ix.length; t += 3) ix2.push(ix[t] + nv, ix[t + 2] + nv, ix[t + 1] + nv);
+    for (let i = 0; i < NA; i++){ const a0 = NV * (NA + 1) + i, b0 = a0 + nv; ix2.push(a0, b0, a0 + 1, a0 + 1, b0, b0 + 1); }
+    const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute(pos2, 3)); fg.setIndex(ix2); fg.computeVertexNormals();
+    const fc0 = new THREE.Color(S.col.top), fc1 = new THREE.Color(S.col.frill), fc2 = new THREE.Color(S.col.frill).lerp(new THREE.Color(0x2a2018), .45);
+    both(rigid(fg, 0xffffff, hb, .62, (v) => { const d = v.distanceTo(B0) / fp.h; return fc0.clone().lerp(fc1, ss(.25, .6, d)).lerp(fc2, ss(.82, 1, d) * .8); }));
+    for (let i = 0; i <= 16; i++){ rim(-.97 + 1.94 * i / 16, tv); const dr = tv.clone().sub(B0).normalize();
+      const g2 = curvedCone(.15, .07, 0, 6, 2); place(g2, [tv.x, tv.y, tv.z], [dr.x, dr.y, dr.z], [0, 1, 0]); both(rigid(g2, 0xcfc3a3, hb, .5)); } }
   if (S.key === 'stego'){ const pc = new THREE.Color(S.col.plate), pe = new THREE.Color(S.col.plate2), pb = new THREE.Color(S.col.top);
-    let k = 0; for (let s = .9; s < S.head - 1.4; s += .52){ const sp = atS(s); const mid = 1 - Math.abs(s - (S.pel + .6)) / 5.2; if (mid < .12) continue;
-      const hgt = .22 + mid * .72; const side = (k++ % 2) ? 1 : -1; const y0 = sp[1] + sp[3] * .8;
-      const sh = new THREE.Shape(); sh.moveTo(-hgt * .5, 0); sh.bezierCurveTo(-hgt * .62, hgt * .55, -hgt * .2, hgt * .95, hgt * .05, hgt); sh.bezierCurveTo(hgt * .4, hgt * .9, hgt * .6, hgt * .45, hgt * .5, 0); sh.lineTo(-hgt * .5, 0);
+    let k = 0; for (let s = .9; s < S.head - 1.4; s += .55){ const sp = atS(s); const mid = 1 - Math.abs(s - (S.pel - .4)) / (s < S.pel - .4 ? 3.6 : 5.4); if (mid < .1) continue;
+      const hgt = .24 + mid * mid * 1.08; const side = (k++ % 2) ? 1 : -1; const y0 = sp[1] + sp[3] * .8;
+      const sh = new THREE.Shape(); sh.moveTo(-hgt * .36, 0); sh.bezierCurveTo(-hgt * .62, hgt * .38, -hgt * .42, hgt * .72, -hgt * .06, hgt); sh.bezierCurveTo(hgt * .2, hgt * .78, hgt * .5, hgt * .42, hgt * .34, 0); sh.lineTo(-hgt * .36, 0);
       const g = new THREE.ExtrudeGeometry(sh, { depth: .02 * hgt + .015, bevelEnabled: true, bevelThickness: .025, bevelSize: .022, bevelSegments: 2, curveSegments: 8 });
       g.translate(0, 0, -.015); g.rotateY(Math.PI / 2); g.rotateZ(side * .1); g.translate(side * .07, y0 - .05, sp[0]);
       const fn = (v) => { const t = clamp((v.y - y0) / hgt, 0, 1); const c2 = pb.clone().lerp(pc, ss(.05, .4, t)); const vein = Math.sin(v.z * 26 + v.y * 15) * .5 + .5; c2.lerp(pe, ss(.82, 1, t) * .6 + vein * .1 * t); return c2; };
       both(rigid(g, 0xffffff, owner(Math.floor(s)), .55, fn)); }
-    for (const sd of [1, -1]) for (const q of [0, 1]){ const sp = samples[2 + q * 2]; const g = curvedCone(.75, .07, .1, 8, 4); place(g, [sd * sp[2] * .6, sp[1] + sp[3] * .5, sp[0]], [sd * .75, .45, -.35 + q * .2], [0, 1, 0]); both(rigid(g, S.col.horn, owner(Math.floor(sp[5])), .4)); } }
+    for (const sd of [1, -1]) for (const q of [0, 1]){ const sp = samples[2 + q * 2]; const g = curvedCone(.9, .085, .08, 8, 4); place(g, [sd * sp[2] * .6, sp[1] + sp[3] * .5, sp[0]], [sd * .78, .5, -.38 + q * .22], [0, 1, 0]); both(rigid(g, S.col.horn, owner(Math.floor(sp[5])), .4)); } }
   if (S.key === 'ankylo'){ for (const sd of [1, -1]) for (let s = S.pel - 1.2; s < S.chest + 1.3; s += .45){ const sp = atS(s); const g = curvedCone(.26, .09, 0, 6, 2);
-      place(g, [sd * sp[2] * .95, sp[1] + .05, sp[0]], [sd, .25, -.15], [0, 1, 0]); both(rigid(g, S.col.horn, owner(Math.floor(s)), .5)); } }
+      place(g, [sd * sp[2] * .95, sp[1] - .02, sp[0]], [sd, .12, -.3], [0, 1, 0]); both(rigid(g, S.col.horn, owner(Math.floor(s)), .5)); } }
   if (S.key === 'dilo'){ const cc = new THREE.Color(S.col.crest), c2 = new THREE.Color(0xe8d8a8);
-    for (const sd of [1, -1]){ const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.bezierCurveTo(.06, .2, .3, .26, .48, .14); sh.bezierCurveTo(.54, .08, .56, .03, .56, 0); sh.lineTo(0, 0);
-      const g = new THREE.ExtrudeGeometry(sh, { depth: .008, bevelEnabled: true, bevelThickness: .006, bevelSize: .006, bevelSegments: 1, curveSegments: 10 }); g.rotateY(-Math.PI / 2); g.rotateZ(sd * .12); g.translate(sd * .045, H[1] + .085, H[0] + .02);
+    for (const sd of [1, -1]){ const sh = new THREE.Shape(); sh.moveTo(-.04, .02); sh.lineTo(-.12, .1); sh.bezierCurveTo(-.02, .25, .12, .27, .22, .24); sh.bezierCurveTo(.36, .19, .5, .09, .62, .02); sh.lineTo(.62, 0); sh.lineTo(-.04, 0);
+      const g = new THREE.ExtrudeGeometry(sh, { depth: .008, bevelEnabled: true, bevelThickness: .005, bevelSize: .005, bevelSegments: 1, curveSegments: 10 }); g.rotateY(-Math.PI / 2); g.rotateZ(sd * .2); g.translate(sd * .062, H[1] + .065, H[0] - .02);
       both(rigid(g, 0xffffff, hb, .55, (v) => cc.clone().lerp(c2, (Math.sin((v.z - H[0]) * 46) > .4 ? .55 : 0) * clamp((v.y - H[1] - .14) * 9, 0, 1)))); } }
+  if (S.key === 'para'){ // v8: smooth hollow crest tube sweeping back past the skull, flattened side to side, tapering slightly
+    const pts = [[0, H[1] + .2, H[0] + .42], [0, H[1] + .36, H[0] + .02], [0, H[1] + .5, H[0] - .42], [0, H[1] + .6, H[0] - .86], [0, H[1] + .63, H[0] - 1.18]].map(p => new THREE.Vector3(p[0], p[1], p[2]));
+    const curve = new THREE.CatmullRomCurve3(pts); const TS = 24, RS = 10; const g = new THREE.TubeGeometry(curve, TS, .1, RS, false); const pos = g.attributes.position, cc = new THREE.Vector3();
+    for (let i = 0; i <= TS; i++){ const t = i / TS; curve.getPointAt(t, cc); const f = lerp(1, .78, t);
+      for (let j = 0; j <= RS; j++){ const v = i * (RS + 1) + j; pos.setXYZ(v, (pos.getX(v) - cc.x) * f * .72 + cc.x, (pos.getY(v) - cc.y) * f + cc.y, (pos.getZ(v) - cc.z) * f + cc.z); } }
+    g.computeVertexNormals(); const end = curve.getPointAt(1), tan = curve.getTangentAt(1); const cap = new THREE.SphereGeometry(.078, 10, 6); cap.scale(.72, 1, .9); cap.translate(end.x, end.y, end.z);
+    const c0 = new THREE.Color(S.col.crest), c1 = new THREE.Color(S.col.crest).multiplyScalar(.7); const cf = (v) => c0.clone().lerp(c1, clamp((H[0] - v.z) / 1.2, 0, 1));
+    both(rigid(g, 0xffffff, hb, .6, cf)); both(rigid(cap, 0xffffff, hb, .6, cf)); }
   if (S.quills){ const qc = new THREE.Color(0x2a2016), qt = new THREE.Color(0x8a7454);
     for (let s = S.pel - 2.6; s < S.head + .2; s += .12){ const sp = atS(s); const L = (.03 + .028 * ss(S.pel - 2.6, S.chest, s) * (1 - ss(S.head - .6, S.head + .2, s))) * (1 + Math.sin(s * 9) * .15);
       const g = curvedCone(L, .004, -.5, 4, 2); place(g, [0, sp[1] + sp[3] * .92, sp[0]], [0, .55, -.8], [0, 1, 0]); hi.push(rigid(g, 0xffffff, owner(Math.floor(s)), .6, (v) => qc.clone().lerp(qt, clamp((v.y - sp[1] - sp[3]) / L, 0, 1)))); } }
@@ -588,17 +625,7 @@ const SKIN_COLOR = `
   vec3 tp = vRP * uScale;
   vec4 sk = texture2D(uSkin, tp.zy) * tw.x + texture2D(uSkin, tp.xz) * tw.y + texture2D(uSkin, tp.xy) * tw.z;
   float dH = sk.r;
-#ifdef DINO_HI
-  { // v7 close-up scales: big tubercle rosettes on back and flanks, transverse scutes on the belly, both only when near
-    float nr = 1.0 - smoothstep(0.02, 0.08, length(fwidth(tp)));
-    vec3 tb = tp * 0.34 + 0.37;
-    vec4 sk2 = texture2D(uSkin, tb.zy) * tw.x + texture2D(uSkin, tb.xz) * tw.y + texture2D(uSkin, tb.xy) * tw.z;
-    float tub = smoothstep(0.35, 0.9, sk2.r) * (1.0 - vMask.w) * smoothstep(-0.3, 0.5, vRN.y);
-    dH = mix(dH, max(dH, tub * 1.05), 0.55 * nr);
-    float fz = fract(vRP.z * uScale * 1.6 + sk.b * 0.25); float scute = smoothstep(0.0, 0.1, fz) * (1.0 - smoothstep(0.82, 1.0, fz));
-    dH = mix(dH, dH * 0.35 + scute * 0.65, smoothstep(0.5, 0.9, vMask.w) * smoothstep(-0.2, -0.7, vRN.y) * nr);
-  }
-#endif
+  // v8: the v7 close-up tubercle/scute layer is gone - it cost three extra texture reads per pixel and was invisible at park zoom
   vec3 q = vRP / uSize * 6.0 + uPat.zwz;
   float belly = vMask.w;
   float dorsal = smoothstep(0.6, 0.97, vRN.y) * smoothstep(-0.01, 0.0, vMask.y); // jaw vertices carry a tiny negative breath flag: no dorsal stripe on the lip
@@ -612,8 +639,7 @@ const SKIN_COLOR = `
   skin = mix(skin, uMark, dorsal * 0.35);
   skin *= 0.88 + 0.24 * dfbm(q * 0.45 + 9.0);
   float fwT = length(fwidth(tp)); float near = 1.0 - smoothstep(0.012, 0.045, fwT);
-  skin *= mix(1.0, mix(0.72, 1.07, min(sk.g, 0.35 + dH)), near);
-  skin = mix(skin, skin * vec3(1.06, 1.03, 0.95), smoothstep(0.6, 0.95, dH) * 0.5 * near);
+  skin *= mix(1.0, mix(0.9, 1.03, min(sk.g, 0.35 + dH)), near); // v8: soft skin mottling only, no scale pattern
   diffuseColor.rgb = mix(vColor.rgb, skin, vMask.x);
 `;
 function makeSkin(S, U, hi){
@@ -660,7 +686,7 @@ export class Dino {
     const rnd = mulberry(opts.seed ?? ((Math.random() * 1e9) | 0)); this.rnd = rnd;
     const jit = (hex, h, l) => { const c = new THREE.Color(hex); c.offsetHSL((rnd() - .5) * h, (rnd() - .5) * .06, (rnd() - .5) * l); return c; };
     this.U = { uSkin: { value: skinTexture() }, uTop: { value: jit(S.col.top, .04, .07) }, uBelly: { value: jit(S.col.belly, .03, .06) }, uMark: { value: jit(S.col.mark, .03, .05) },
-      uPat: { value: new THREE.Vector4(S.col.pat, S.col.patF * (.9 + rnd() * .2), rnd() * 40, rnd() * 40) }, uScale: { value: S.scaleF }, uBump: { value: .42 / (26 * S.scaleF) }, uSize: { value: S.size }, uBreath: { value: 0 } };
+      uPat: { value: new THREE.Vector4(S.col.pat, S.col.patF * (.9 + rnd() * .2), rnd() * 40, rnd() * 40) }, uScale: { value: S.scaleF }, uBump: { value: .14 / (26 * S.scaleF) }, uSize: { value: S.size }, uBreath: { value: 0 } };
     this.matHi = makeSkin(S, this.U, true); this.matLo = makeSkin(S, this.U, false); const eye = eyeMaterial(S);
     this.meshHi = new THREE.SkinnedMesh(B.hi, [this.matHi, eye]); this.meshLo = new THREE.SkinnedMesh(B.lo, [this.matLo, eye]); this._loMats = [this.matLo, eye]; this._invMats = [INVIS, INVIS];
     const rootBone = bones[S.pel]; this.root.add(rootBone); this.root.add(this.meshHi); this.root.add(this.meshLo); this.root.updateMatrixWorld(true);
