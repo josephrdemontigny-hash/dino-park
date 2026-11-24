@@ -161,12 +161,13 @@ terrMat.onBeforeCompile = (sh) => { Object.assign(sh.uniforms, TU);
     vec3 pen = texture2D(tDirt, w1 * 1.3).rgb * vec3(0.92, 0.86, 0.74);
     col = mix(col, mix(col, pen, 0.75), mk.g);
     vec3 gv = texture2D(tGravel, vWP.xz / 4.0).rgb * vec3(0.86, 0.78, 0.62);
+    col = mix(col, mix(col, di * 0.78, 0.55), mk.b * (1.0 - smoothstep(0.25, 0.65, mk.r)));
     col = mix(col, gv, smoothstep(0.25, 0.65, mk.r));
     col *= mix(0.4, 1.0, smoothstep(-3.0, 0.2, vWP.y));
     if (uGrid > 0.5 && mk.a >= 0.0){ vec2 g = abs(fract((vWP.xz - uMask.xy) / ${TILE.toFixed(1)}) - 0.5); float l = smoothstep(0.47, 0.495, max(g.x, g.y)); if (muv.x > 0.0 && muv.y > 0.0 && muv.x < 1.0 && muv.y < 1.0) col = mix(col, vec3(0.95, 0.85, 0.55), l * 0.35); }
     diffuseColor.rgb *= col;`);
 };
-terrMat.customProgramCacheKey = () => 'terrain1';
+terrMat.customProgramCacheKey = () => 'terrain7';
 const terrain = new THREE.Mesh(terrGeo, terrMat); terrain.receiveShadow = true; scene.add(terrain);
 
 /* ================= water ================= */
@@ -185,9 +186,21 @@ const frondMat = M.windify(new THREE.MeshStandardMaterial({ map: TEX.frond, alph
 const fernMat = M.windify(new THREE.MeshStandardMaterial({ map: TEX.fern, alphaTest: 0.45, side: THREE.DoubleSide, vertexColors: true, roughness: 0.85, color: 0xb0c088 }), 0.05, 0.2);
 const cycFrondMat = M.windify(new THREE.MeshStandardMaterial({ map: TEX.fern, alphaTest: 0.45, side: THREE.DoubleSide, vertexColors: true, roughness: 0.85, color: 0xa8bc80 }), 0.03, 2);
 const bushMat = M.windify(new THREE.MeshStandardMaterial({ map: TEX.leaf, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true, roughness: 0.9, color: 0x9cae78 }), 0.04, 0.3);
-const barkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+const barkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }); barkMat.onBeforeCompile = (sh) => M.nearFadePatch(sh); barkMat.customProgramCacheKey = () => 'bark7f';
+const grassMat = M.windify(new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.92 }), 0.14, 0.05);
+const shrubMat = M.windify(new THREE.MeshStandardMaterial({ map: TEX.leaf, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true, roughness: 0.88, color: 0xa8bc84 }), 0.035, 0.3);
+const VEG_HI = new Set(['grass', 'flower', 'shrub', 'log', 'stump']); // v7 ground cover: off at the low setting
+const VEG_SMALL = new Set(['grass', 'flower']); // also the near-camera kinds
+const NEARV = { t: 0, x: 1e9, z: 1e9, d: -1 };
+function nearVeg(force){ // fill the grass/flower instances with pool items around the camera target; none when zoomed out
+  const on = QUALITY.level > 0 && !title.on && cam.dist < 120, R = 34 + cam.dist * 0.55;
+  if (!force && Math.hypot(cam.tx - NEARV.x, cam.tz - NEARV.z) < 6 && Math.abs(cam.dist - NEARV.d) < 8) return; NEARV.x = cam.tx; NEARV.z = cam.tz; NEARV.d = cam.dist;
+  for (const kind of VEG_SMALL){ const V = VEG[kind]; if (!V) continue; let n = 0; const cap = V.ims[0].instanceMatrix.count;
+    if (on && V.cand) for (const it of V.cand){ const dx = it.x - cam.tx, dz = it.z - cam.tz; if (dx * dx + dz * dz > R * R) continue; for (const im of V.ims) im.setMatrixAt(n, it.m); if (++n >= cap) break; }
+    for (const im of V.ims){ im.count = n; im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); } } }
+function nearVegTick(dt){ NEARV.t -= dt; if (NEARV.t > 0) return; NEARV.t = 0.3; nearVeg(false); }
 const VEG = {}; // kind -> {parts:[InstancedMesh], items:[{m:Matrix4, i, j, x, z, r}]}
-function vegKind(name, parts, cap){ const ims = parts.map(([geo, mat, cast]) => { const im = new THREE.InstancedMesh(geo, mat, cap); im.castShadow = !!cast; im.receiveShadow = true; im.count = 0; scene.add(im); return im; }); VEG[name] = { ims, items: [] }; }
+function vegKind(name, parts, cap, itemCap){ const ims = parts.map(([geo, mat, cast]) => { const im = new THREE.InstancedMesh(geo, mat, cap); im.castShadow = !!cast; im.receiveShadow = true; im.count = 0; scene.add(im); return im; }); VEG[name] = { ims, items: [], itemCap: itemCap || cap }; }
 {
   const palm = M.palmGeos(), cyc = M.cycadGeos(), bl1 = M.broadleafGeos(1), bl2 = M.broadleafGeos(2);
   vegKind('broad1', [[bl1.trunk, barkMat, true], [bl1.canopy, leafMat, true]], 420);
@@ -197,11 +210,16 @@ function vegKind(name, parts, cap){ const ims = parts.map(([geo, mat, cast]) => 
   vegKind('bush', [[M.bushGeo(), bushMat, false]], 1600);
   vegKind('fern', [[M.fernGeo(), fernMat, false]], 1400);
   vegKind('rock', [[M.rockGeo(5), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, map: TEX.rock }), true]], 200);
+  vegKind('shrub', [[M.shrubGeo(3), shrubMat, false]], 500);
+  vegKind('grass', [[M.grassGeo(), grassMat, false]], 1400, 16000); // near-camera only: drawn from a dense pool around the view target
+  vegKind('flower', [[M.flowerGeo(), grassMat, false]], 360, 4000);
+  vegKind('log', [[M.logGeo(), barkMat, true]], 60);
+  vegKind('stump', [[M.stumpGeo(), barkMat, false]], 60);
 }
 function scatterVegetation(){
   const r = mulberry(1234); const _m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(), p = new THREE.Vector3();
-  const tries = { broad1: 2600, broad2: 2600, palm: 1800, cycad: 1600, bush: 6000, fern: 5000, rock: 900 };
-  for (const kind in tries){ const V = VEG[kind], cap = V.ims[0].instanceMatrix.count;
+  const tries = { broad1: 2600, broad2: 2600, palm: 1800, cycad: 1600, bush: 6000, fern: 5000, rock: 900, shrub: 2400, grass: 60000, flower: 16000, log: 700, stump: 700 };
+  for (const kind in tries){ const V = VEG[kind], cap = V.itemCap;
     for (let t = 0; t < tries[kind] && V.items.length < cap; t++){
       const x = TERR.cx + (r() - 0.5) * TERR.size * 0.92, z = TERR.cz + (r() - 0.5) * TERR.size * 0.92; const h = H(x, z);
       if (h < (kind === 'palm' ? 0.6 : 1.0) || h > (kind === 'rock' ? 50 : 34)) continue;
@@ -211,12 +229,13 @@ function scatterVegetation(){
       const edge = inside ? sstep(HALF - 40, HALF - 4, Math.max(Math.abs(x), Math.abs(z))) : 1;
       const clump = fbm(x * 0.03 + 50, z * 0.03 + 20);
       let dens = kind === 'palm' ? 0.25 + sstep(2.6, 0.9, h) * 0.75 : kind === 'rock' ? 0.35 : 0.2 + clump * 0.9;
-      if (inside) dens *= kind === 'bush' || kind === 'fern' ? 0.35 + edge * 0.65 : kind === 'rock' ? 0.4 : 0.08 + edge * 0.92;
+      if (VEG_SMALL.has(kind)) dens = (inside ? 0.55 + edge * 0.3 : 0.35) * (0.5 + clump * 0.7) * (kind === 'flower' ? 0.6 : 1);
+      else if (inside) dens *= kind === 'bush' || kind === 'fern' || kind === 'shrub' ? 0.35 + edge * 0.65 : kind === 'rock' ? 0.4 : kind === 'log' || kind === 'stump' ? 0.12 + edge * 0.88 : 0.08 + edge * 0.92;
       if (Math.hypot(x, z - 96) < 30) dens = 0; // keep the gate plaza clear
       if (r() > dens) continue;
-      const sc = kind === 'rock' ? 0.6 + r() * 2.2 : kind.startsWith('broad') ? 0.75 + r() * 0.5 : kind === 'palm' ? 0.8 + r() * 0.45 : kind === 'cycad' ? 0.8 + r() * 0.7 : 0.7 + r() * 0.8;
-      e.set(kind === 'rock' ? r() * 0.4 : (r() - 0.5) * 0.08, r() * TAU, kind === 'rock' ? r() * 0.4 : (r() - 0.5) * 0.08); q.setFromEuler(e); s.set(sc, sc * (kind.startsWith('broad') ? 0.85 + r() * 0.35 : 1), sc); p.set(x, h - (kind === 'rock' ? 0.4 * sc : 0.15), z);
-      V.items.push({ m: new THREE.Matrix4().compose(p, q, s), i, j, x, z, r: kind.startsWith('broad') ? 2.2 * sc : kind === 'palm' ? 1.4 : 1.2 * sc, hidden: false });
+      const sc = kind === 'rock' ? 0.6 + r() * 2.2 : kind.startsWith('broad') ? 0.75 + r() * 0.5 : kind === 'palm' ? 0.8 + r() * 0.45 : kind === 'cycad' ? 0.8 + r() * 0.7 : VEG_SMALL.has(kind) ? 0.75 + r() * 0.6 : kind === 'log' || kind === 'stump' ? 0.8 + r() * 0.4 : 0.7 + r() * 0.8;
+      e.set(kind === 'rock' ? r() * 0.4 : (r() - 0.5) * 0.08, r() * TAU, kind === 'rock' ? r() * 0.4 : (r() - 0.5) * 0.08); q.setFromEuler(e); s.set(sc, sc * (kind.startsWith('broad') ? 0.85 + r() * 0.35 : 1), sc); p.set(x, h - (kind === 'rock' ? 0.4 * sc : VEG_SMALL.has(kind) ? 0.04 : kind === 'log' ? 0.1 : 0.15), z);
+      V.items.push({ m: new THREE.Matrix4().compose(p, q, s), i, j, x, z, r: kind.startsWith('broad') ? 2.2 * sc : kind === 'palm' ? 1.4 : kind === 'log' ? 2.2 * sc : VEG_SMALL.has(kind) ? 0.4 * sc : 1.2 * sc, sc, small: VEG_SMALL.has(kind), hidden: false });
     }
   }
 }
@@ -224,6 +243,7 @@ function vegBlocked(it){ // trees cleared by paths, buildings and fence lines
   if (!inGrid(it.i, it.j)) return false;
   const k = it.j * GRID + it.i, ty = tileType[k];
   if (ty === T_PATH || ty === T_BUILD) return true;
+  if (it.small && ty === T_PEN) return true;
   if (ty === T_PEN || tileType[k] === T_PEN){ const pen = pens.get(tileRef[k]); if (pen){ const x0 = eX(pen.i0), x1 = eX(pen.i1 + 1), z0 = eX(pen.j0), z1 = eX(pen.j1 + 1);
     const d = Math.min(it.x - x0, x1 - it.x, it.z - z0, z1 - it.z); if (d < it.r + 0.8) return true; if (pen.feeders.some(f => Math.hypot(tX(f.i) - it.x, tZ(f.j) - it.z) < 4)) return true; } }
   // near fences of a neighbouring pen
@@ -231,11 +251,14 @@ function vegBlocked(it){ // trees cleared by paths, buildings and fence lines
     if (pen){ const x0 = eX(pen.i0), x1 = eX(pen.i1 + 1), z0 = eX(pen.j0), z1 = eX(pen.j1 + 1); const dx = Math.max(x0 - it.x, 0, it.x - x1), dz = Math.max(z0 - it.z, 0, it.z - z1); if (Math.hypot(dx, dz) < it.r + 0.8) return true; } } }
   return false;
 }
+let camObsDirty = true; // camera-obstacle boxes need a rebuild
 function refreshVegetation(){
   const lvl = QUALITY.veg[QUALITY.level];
-  for (const kind in VEG){ const V = VEG[kind]; let n = 0; const lim = Math.floor(V.items.length * lvl);
+  for (const kind in VEG){ const V = VEG[kind]; let n = 0; const lim = VEG_HI.has(kind) && QUALITY.level === 0 ? 0 : Math.floor(V.items.length * lvl);
+    if (VEG_SMALL.has(kind)){ V.cand = []; for (let a = 0; a < lim; a++){ const it = V.items[a]; if (!vegBlocked(it)) V.cand.push(it); } continue; }
     for (let a = 0; a < V.items.length && a < lim; a++){ const it = V.items[a]; if (vegBlocked(it)) continue; for (const im of V.ims) im.setMatrixAt(n, it.m); n++; }
     for (const im of V.ims){ im.count = n; im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); } }
+  try { nearVeg(true); } catch (e) { /* camera not created yet during boot */ }
 }
 
 /* ================= world state ================= */
@@ -269,18 +292,40 @@ function drawMask(){
   for (let j = 0; j < GRID; j++) for (let i = 0; i < GRID; i++) if (tileType[idx(i, j)] === T_PATH){
     const L = isPath(i - 1, j), R = isPath(i + 1, j), U = isPath(i, j - 1), D = isPath(i, j + 1); const ins = tp * 0.14;
     g.fillRect(i * tp + (L ? 0 : ins), j * tp + (U ? 0 : ins), tp - (L ? 0 : ins) - (R ? 0 : ins), tp - (U ? 0 : ins) - (D ? 0 : ins)); }
+  // v7 path edging: a worn soil band just outside the gravel (blue channel), plus stone curbs at the detailed settings
+  g.fillStyle = 'rgb(0,0,255)'; const bw = tp * 0.1;
+  for (let j = 0; j < GRID; j++) for (let i = 0; i < GRID; i++) if (tileType[idx(i, j)] === T_PATH){
+    const L = isPath(i - 1, j), R = isPath(i + 1, j), U = isPath(i, j - 1), D = isPath(i, j + 1); const ins = tp * 0.14;
+    if (!L) g.fillRect(i * tp + ins - bw, j * tp, bw, tp); if (!R) g.fillRect((i + 1) * tp - ins, j * tp, bw, tp);
+    if (!U) g.fillRect(i * tp, j * tp + ins - bw, tp, bw); if (!D) g.fillRect(i * tp, (j + 1) * tp - ins, tp, bw); }
+  g.fillStyle = 'rgb(255,0,0)';
   // gate apron
-  g.fillRect(GATE.i * tp, (GATE.j) * tp, tp * 2, tp * 3);
+  g.fillRect(GATE.i * tp, (GATE.j) * tp, tp * 2, tp * 3); rebuildCurbs();
   maskTex.needsUpdate = true;
 }
+
+const _yAxis = new THREE.Vector3(0, 1, 0);
+const curbIM = new THREE.InstancedMesh(M.curbGeo(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), 2600); curbIM.count = 0; curbIM.receiveShadow = true; curbIM.castShadow = false; scene.add(curbIM);
+function rebuildCurbs(){ const _m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), ins = TILE * 0.14; let n = 0;
+  const put = (x, z, len, alongZ) => { if (n >= curbIM.instanceMatrix.count || len < 0.3) return; q.setFromAxisAngle(_yAxis, alongZ ? Math.PI / 2 : 0); s.set(len, 1, 1); p.set(x, H(x, z) - 0.02, z); _m.compose(p, q, s); curbIM.setMatrixAt(n++, _m); };
+  for (let j = 0; j < GRID; j++) for (let i = 0; i < GRID; i++) if (tileType[idx(i, j)] === T_PATH && j < GATE.j){
+    const L = isPath(i - 1, j), R = isPath(i + 1, j), U = isPath(i, j - 1), D = isPath(i, j + 1); const x0 = eX(i), z0 = eX(j);
+    const za = z0 + (U ? 0 : ins), zb = z0 + TILE - (D ? 0 : ins), xa = x0 + (L ? 0 : ins), xb = x0 + TILE - (R ? 0 : ins);
+    if (!L) put(x0 + ins - 0.06, (za + zb) / 2, zb - za, true); if (!R) put(x0 + TILE - ins + 0.06, (za + zb) / 2, zb - za, true);
+    if (!U) put((xa + xb) / 2, z0 + ins - 0.06, xb - xa, false); if (!D) put((xa + xb) / 2, z0 + TILE - ins + 0.06, xb - xa, false); }
+  curbIM.count = n; curbIM.instanceMatrix.needsUpdate = true; curbIM.computeBoundingSphere(); curbIM.visible = detailHi(); }
 
 /* ---------- buildings ---------- */
 const bldMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.04 });
 const bldGeoCache = {};
-function bldGeo(type){ return bldGeoCache[type] || (bldGeoCache[type] = M.buildingGeo(type)); }
+const detailHi = () => QUALITY.level >= 1; // v7: detailed buildings, fences, guests, curbs and ground cover above the low setting
+function bldGeo(type, hi = detailHi()){ const k = type + (hi ? ':h' : ':l'); return bldGeoCache[k] || (bldGeoCache[k] = M.buildingGeo(type, hi)); }
+bldMat.map = canvasTex(M.signAtlasCanvas(), true, false); // v7: building signs live in the building geometry (one draw call per building); bodies sample the atlas' white row
+function setBldDetail(g, hi){ const u = g.userData; if (!u.btype) return; u.body.geometry = bldGeo(u.btype, hi); }
+function applyBuildingDetail(){ const hi = detailHi(); for (const b of buildings.values()) if (b.mesh) setBldDetail(b.mesh, hi); if (gateMesh) setBldDetail(gateMesh, hi); }
 const signTex = canvasTex(M.signCanvas('PRIMEVAL PARK', 'ISLA SOMBRA  -  EST. 2026'), true, false);
 function makeBuildingMesh(type){
-  const g = new THREE.Group(); const m = new THREE.Mesh(bldGeo(type), bldMat); m.castShadow = true; m.receiveShadow = true; g.add(m);
+  const g = new THREE.Group(); const m = new THREE.Mesh(bldGeo(type), bldMat); m.castShadow = true; m.receiveShadow = true; g.add(m); g.userData.btype = type; g.userData.body = m;
   if (type === 'gate'){ const s = new THREE.Mesh(new THREE.PlaneGeometry(9.6, 2.4), new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.7 })); s.position.set(0, 9.2, 0.6); g.add(s);
     const s2 = s.clone(); s2.rotation.y = Math.PI; s2.position.z = -0.6; g.add(s2);
     for (const sd of [-1, 1]){ const f = new THREE.PointLight(0xff9a40, 0, 18, 2); f.position.set(sd * 5.2, 13.2, 0); g.add(f); const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.soft, color: 0xffb060, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); fl.scale.set(1.6, 2.2, 1); fl.position.set(sd * 5.2, 13.3, 0); g.add(fl); g.userData.flames = (g.userData.flames || []).concat(fl); } }
@@ -307,10 +352,10 @@ function placeBuilding(type, i, j, opts = {}){
   b.rot = opts.rot !== undefined ? opts.rot : (B.inPen ? 0 : faceRot(i, j, w, h));
   const cx = tX(i) + (w - 1) * TILE / 2, cz = tZ(j) + (h - 1) * TILE / 2; let mn = 99; for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]]) mn = Math.min(mn, H(cx + dx * w * TILE * 0.45, cz + dz * h * TILE * 0.45));
   const mesh = makeBuildingMesh(type); mesh.position.set(cx, mn - 0.05, cz); mesh.rotation.y = b.rot; scene.add(mesh); b.mesh = mesh; b.x = cx; b.z = cz;
-  buildings.set(id, b); return b;
+  buildings.set(id, b); camObsDirty = true; return b;
 }
 function removeBuilding(b){
-  scene.remove(b.mesh); buildings.delete(b.id);
+  scene.remove(b.mesh); buildings.delete(b.id); camObsDirty = true;
   if (b.pen >= 0){ const pen = pens.get(b.pen); if (pen) pen.feeders = pen.feeders.filter(f => f.id !== b.id); }
   else for (let dj = 0; dj < b.h; dj++) for (let di = 0; di < b.w; di++){ const k = idx(b.i + di, b.j + dj); tileType[k] = T_EMPTY; tileRef[k] = -1; }
 }
@@ -318,7 +363,9 @@ function removeBuilding(b){
 /* ---------- pens + fences ---------- */
 const fenceMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.15 });
 const chainMat = new THREE.MeshStandardMaterial({ map: TEX.chain, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.4, metalness: 0.6, color: 0xbfc4c2 });
-const FENCE_IM = FT.map((_, t) => { const g = M.fenceGeos(t); const mk = (geo, mat, cast) => { const im = new THREE.InstancedMesh(geo, mat, 1400); im.count = 0; im.castShadow = cast; im.receiveShadow = true; im.frustumCulled = false; scene.add(im); return im; };
+const FENCE_GEO = FT.map((_, t) => [M.fenceGeos(t, false), M.fenceGeos(t, true)]);
+function applyFenceDetail(){ const hi = detailHi() ? 1 : 0; FENCE_IM.forEach((F, t) => { const g = FENCE_GEO[t][hi]; F.post.geometry = g.post; F.panel.geometry = g.panel; }); }
+const FENCE_IM = FT.map((_, t) => { const g = FENCE_GEO[t][1]; const mk = (geo, mat, cast) => { const im = new THREE.InstancedMesh(geo, mat, 1400); im.count = 0; im.castShadow = cast; im.receiveShadow = true; im.frustumCulled = false; scene.add(im); return im; };
   return { post: mk(g.post, fenceMat, true), panel: mk(g.panel, fenceMat, true), mesh: g.mesh ? mk(g.mesh, chainMat, false) : null }; });
 function penSegments(pen){
   const segs = []; const { i0, i1, j0, j1 } = pen;
@@ -328,7 +375,7 @@ function penSegments(pen){
   for (let j = j0; j <= j1; j++) segs.push([eX(i1 + 1), eX(j), eX(i1 + 1), eX(j + 1), 1, 0]);
   return segs;
 }
-function rebuildFences(){
+function rebuildFences(){ camObsDirty = true;
   const _m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(), p = new THREE.Vector3(); const counts = FT.map(() => [0, 0, 0]);
   for (const pen of pens.values()){
     const F = FENCE_IM[pen.tier], c = counts[pen.tier]; const posts = new Set();
@@ -528,16 +575,36 @@ function releaseHeld(pen){ for (const d of dinos) if (d.pen === pen.id && d.stat
 
 /* ================= guests ================= */
 const GCAP = 300;
-const GG = M.guestGeos();
-const guestShirtMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
-const guestBodyMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
-guestBodyMat.onBeforeCompile = (sh) => { sh.uniforms.uTime = M.WIND;
-  sh.vertexShader = 'uniform float uTime; attribute float aLeg; attribute vec2 aWalk;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-    if (aLeg != 0.0){ float a = sin(uTime * 9.0 + aWalk.x) * aLeg * 0.5 * aWalk.y; float py = 0.92; float yy = transformed.y - py; float zz = transformed.z; transformed.y = py + yy * cos(a) - zz * sin(a); transformed.z = yy * sin(a) + zz * cos(a); }`); };
-guestBodyMat.customProgramCacheKey = () => 'guestwalk';
-const walkAttr = new THREE.InstancedBufferAttribute(new Float32Array(GCAP * 2), 2); walkAttr.setUsage(THREE.DynamicDrawUsage); GG.body.setAttribute('aWalk', walkAttr);
-const guestShirtIM = new THREE.InstancedMesh(GG.shirt, guestShirtMat, GCAP), guestBodyIM = new THREE.InstancedMesh(GG.body, guestBodyMat, GCAP);
-for (const im of [guestShirtIM, guestBodyIM]){ im.count = 0; im.castShadow = true; im.receiveShadow = false; im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(im); }
+// v7: one merged guest mesh (one draw call); aLook picks pants/skin/hair/hat/backpack/shorts per guest in the shader. q0 swaps to the simple v6 shape.
+const GGEO = [M.guestGeos(false), M.guestGeos(true)];
+const walkAttr = new THREE.InstancedBufferAttribute(new Float32Array(GCAP * 2), 2); walkAttr.setUsage(THREE.DynamicDrawUsage);
+const lookAttr = new THREE.InstancedBufferAttribute(new Float32Array(GCAP * 4), 4); lookAttr.setUsage(THREE.DynamicDrawUsage);
+for (const g of GGEO){ g.setAttribute('aWalk', walkAttr); g.setAttribute('aLook', lookAttr); }
+const glslPal = (name, arr) => `const vec3 ${name}[${arr.length}] = vec3[${arr.length}](${arr.map(h => { const c = new THREE.Color(h); return `vec3(${c.r.toFixed(4)},${c.g.toFixed(4)},${c.b.toFixed(4)})`; }).join(',')});`;
+const GP = M.GUEST_PAL;
+const GUEST_VS_HEAD = `uniform float uTime; attribute float aLeg; attribute float aPart; attribute vec2 aWalk; attribute vec4 aLook;\n`;
+const GUEST_VS_BEGIN = `#include <begin_vertex>
+  int gPart = int(aPart + 0.5); int gF = int(aLook.w + 0.5); int gHat = gF % 3; int gPack = (gF / 3) % 2;
+  if ((gPart == 5 && gHat != 1) || (gPart == 6 && gHat != 2) || (gPart == 7 && gPack == 0)) transformed = vec3(0.0, 1.3, 0.0);
+  if (aLeg != 0.0){ bool arm = abs(aLeg) > 1.5; float sw = arm ? -sign(aLeg) * 0.42 : aLeg * 0.5; float a = sin(uTime * 9.0 + aWalk.x) * sw * aWalk.y; float py = arm ? 1.5 : 0.92;
+    float yy = transformed.y - py; float zz = transformed.z; transformed.y = py + yy * cos(a) - zz * sin(a); transformed.z = yy * sin(a) + zz * cos(a); }`;
+function guestPatch(sh, colour){ sh.uniforms.uTime = M.WIND;
+  sh.vertexShader = GUEST_VS_HEAD + (colour ? [glslPal('GP_PANTS', GP.pants), glslPal('GP_SKIN', GP.skin), glslPal('GP_HAIR', GP.hair), glslPal('GP_HAT', GP.hat), glslPal('GP_PACK', GP.pack)].join('\n') + '\n' : '') + sh.vertexShader.replace('#include <begin_vertex>', GUEST_VS_BEGIN);
+  if (colour) sh.vertexShader = sh.vertexShader.replace('#include <color_vertex>', `#include <color_vertex>
+  { int pi = int(aLook.x + 0.5), si = int(aLook.y + 0.5), hi = int(aLook.z + 0.5); int cPart = int(aPart + 0.5); bool shorts = int(aLook.w + 0.5) >= 6;
+    if (cPart == 0) vColor.xyz = color.xyz; else if (cPart == 2) vColor.xyz = GP_PANTS[pi]; else if (cPart == 3) vColor.xyz = GP_SKIN[si]; else if (cPart == 4) vColor.xyz = GP_HAIR[hi];
+    else if (cPart == 5) vColor.xyz = GP_HAT[(pi + hi * 3) % 8]; else if (cPart == 6) vColor.xyz = GP_HAT[2 + (hi % 2)] * (0.9 + 0.1 * float(si % 2)); else if (cPart == 7) vColor.xyz = GP_PACK[(si + pi) % 6];
+    else if (cPart == 8) vColor.xyz = shorts ? GP_SKIN[si] : GP_PANTS[pi]; }`); }
+const guestMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 }); guestMat.onBeforeCompile = (sh) => guestPatch(sh, true); guestMat.customProgramCacheKey = () => 'guest7';
+const guestDepthMat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }); guestDepthMat.onBeforeCompile = (sh) => guestPatch(sh, false); guestDepthMat.customProgramCacheKey = () => 'guest7d';
+const guestIM = new THREE.InstancedMesh(GGEO[1], guestMat, GCAP); guestIM.customDepthMaterial = guestDepthMat;
+guestIM.count = 0; guestIM.castShadow = true; guestIM.receiveShadow = false; guestIM.frustumCulled = false; guestIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(guestIM);
+guestIM.setColorAt(0, new THREE.Color(1, 1, 1));
+function applyGuestDetail(){ guestIM.geometry = GGEO[detailHi() ? 1 : 0]; }
+function guestLook(id){ let h = Math.imul(id + 0x9e37, 0x85ebca6b) >>> 0; h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35) >>> 0; h ^= h >>> 16;
+  const pants = h % 8, skin = (h >>> 3) % 6, hair = (h >>> 6) % 6, hat = ((h >>> 9) % 10) < 3 ? 0 : ((h >>> 9) % 10) < 7 ? 1 : 2, pack = ((h >>> 13) % 10) < 3 ? 1 : 0, shorts = ((h >>> 17) % 10) < 4 ? 1 : 0;
+  const kid = ((h >>> 21) % 100) < 14; return { pants, skin, hair, flags: hat + pack * 3 + shorts * 6, scale: kid ? 0.68 : 0.94 + ((h >>> 24) % 13) / 100 }; }
+const _looks = new Map(); function lookOf(g){ let l = _looks.get(g.id); if (!l){ l = guestLook(g.id); _looks.set(g.id, l); if (_looks.size > 4000) _looks.clear(); } return l; }
 const SHIRTS = [0xd8cfb8, 0x2f4a6a, 0x7a2e24, 0x3c5a34, 0xc9a038, 0x4a4a48, 0xe8e4da, 0x6a4a7a, 0x2a6a6a, 0xb86a3a, 0x8a8a5a, 0x1e2a3a];
 let guests = [];
 const exitDist = new Int32Array(GRID * GRID); const viewMap = new Float32Array(GRID * GRID);
@@ -800,10 +867,10 @@ function updateGuests(dt, hourDt){
         g.tired = (g.tired || 0) + dt; const gs = Math.max(1.2, 3.8 - g.tired * 0.25); g.x = clamp(g.x + ax * gs * dt, x0, x1); g.z = clamp(g.z + az * gs * dt, z0, z1); g.hd = Math.atan2(ax, az); } }
     // write instance
     const y = walkH(g.x, g.z) + (g.yOff || 0); _gq.setFromAxisAngle(_up, g.hd); if (g.spin){ const t = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), g.spin); _gq.multiply(t); }
-    _gp.set(g.x, y, g.z); _gm.compose(_gp, _gq, _gs); guestShirtIM.setMatrixAt(n, _gm); guestBodyIM.setMatrixAt(n, _gm);
-    guestShirtIM.setColorAt(n, _gc.setHex(g.shirt)); walkAttr.setXY(n, g.phase, g.moving * (g.state === 'flee' || g.state === 'inpen' ? 1.4 : 1)); n++;
+    const lk = lookOf(g); _gs.setScalar(lk.scale); _gp.set(g.x, y, g.z); _gm.compose(_gp, _gq, _gs); guestIM.setMatrixAt(n, _gm); lookAttr.setXYZW(n, lk.pants, lk.skin, lk.hair, lk.flags);
+    guestIM.setColorAt(n, _gc.setHex(g.shirt)); walkAttr.setXY(n, g.phase, g.moving * (g.state === 'flee' || g.state === 'inpen' ? 1.4 : 1) * (lk.scale < 0.8 ? 1.25 : 1)); n++;
   }
-  guestShirtIM.count = n; guestBodyIM.count = n; guestShirtIM.instanceMatrix.needsUpdate = true; guestBodyIM.instanceMatrix.needsUpdate = true; if (guestShirtIM.instanceColor) guestShirtIM.instanceColor.needsUpdate = true; walkAttr.needsUpdate = true;
+  guestIM.count = n; guestIM.instanceMatrix.needsUpdate = true; if (guestIM.instanceColor) guestIM.instanceColor.needsUpdate = true; walkAttr.needsUpdate = true; lookAttr.needsUpdate = true;
   if ((G.tick | 0) % 60 === 0) guests = guests.filter(g => !g.gone);
 }
 function onGuestLeft(g){ G.rep = clamp(G.rep + (g.happy - G.rep) * 0.025, 0, 100); }
@@ -994,12 +1061,12 @@ function updateHUD(){
 }
 function showAlert(){
   const loose = looseDinos(), sed = dinos.filter(d => d.state === 'sedated' || d.state === 'airlift'); const el = $('alert');
-  if (!loose.length && !sed.length){ el.classList.add('hidden'); return; }
+  if (!loose.length && !sed.length){ if (!el.classList.contains('hidden')){ el.classList.add('hidden'); placeToasts(); } return; }
   const responding = jeeps.some(j => j.state !== 'return');
   const cnt = {}; for (const d of loose) cnt[SPECIES[d.sp].short] = (cnt[SPECIES[d.sp].short] || 0) + 1; const names = Object.entries(cnt).map(([n, c]) => c > 1 ? `${c} ${/(s|us)$/.test(n) || n === 'T. rex' ? n : n + 's'}` : n).join(', ');
   el.innerHTML = `<div class="stripe"></div><div class="body"><div class="txt"><b>Containment breach</b><span>${loose.length ? `${names} loose in the park.` : 'Target sedated. Recovering.'} ${responding ? 'Rangers responding.' : ''}</span></div>
     <div style="display:flex;flex-direction:column;gap:6px">${!responding && loose.length ? `<button class="btn hz" data-act="dispatch">${ic('ranger')}Rangers <small>${fmtK(dispatchCost())}</small></button>` : ''}${loose.length ? `<button class="btn" data-act="locate">${ic('target')}Locate</button>` : ''}</div></div><div class="stripe"></div>`;
-  el.classList.remove('hidden');
+  el.classList.remove('hidden'); placeToasts();
 }
 $('alert').onclick = (e) => { const b = e.target.closest('[data-act]'); if (!b) return; SFX.click(); if (b.dataset.act === 'dispatch') dispatchRangers(); if (b.dataset.act === 'locate'){ const d = looseDinos()[0]; if (d){ focusOn(d.x, d.z, 60); cam.follow = d; } } showAlert(); };
 function closeSheet(){ sel = null; $('sheet').classList.add('hidden'); updateDockState(); cam.follow = null; }
@@ -1196,7 +1263,11 @@ function tutTick(dt){ if (tutK < 0) return; const s = TUT[tutK]; if (!s || s.mod
   const co = $('coach'), mini = !!tool || !!sel; if (co.classList.contains('mini') !== mini){ co.classList.toggle('mini', mini); placeToasts(); }
   if (tutDoneT > 0){ tutDoneT -= dt; if (tutDoneT <= 0) showTutorial(tutK + 1); return; }
   if (s.done()){ tutDoneT = 1.1; const co = $('coach'); co.classList.add('ok'); const b = co.querySelector('.ct b'); if (b) b.innerHTML = `${ic('check')} ${s.t}`; SFX.cash && SFX.cash(); setTimeout(() => co.classList.remove('ok'), 1100); } }
-function placeToasts(){ const co = $('coach'), t = $('toasts'); if (!co || !t) return; if (co.classList.contains('hidden')){ t.style.top = ''; return; } const r = co.getBoundingClientRect(); t.style.top = (r.bottom + 8) + 'px'; }
+function placeToasts(){ const co = $('coach'), t = $('toasts'), al = $('alert'); if (!co || !t) return;
+  // v7: the breakout banner and the tutorial card share a slot; stack the card under the banner instead of overlapping it
+  const alOn = al && !al.classList.contains('hidden'), coOn = !co.classList.contains('hidden');
+  co.style.top = alOn && coOn ? (al.getBoundingClientRect().bottom + 8) + 'px' : '';
+  if (coOn) t.style.top = (co.getBoundingClientRect().bottom + 8) + 'px'; else if (alOn) t.style.top = (al.getBoundingClientRect().bottom + 8) + 'px'; else t.style.top = ''; }
 
 /* ---------- income readout: net money per minute (at 1x, one minute = 6 game hours), rolling over the last game day ---------- */
 const FLOW_CATS = ['tickets', 'shops', 'upkeep', 'feed', 'fines', 'other'];
@@ -1562,7 +1633,29 @@ $('undoBar').onclick = (e) => { const b = e.target.closest('button'); if (!b) re
 function afterStructureChange(){ drawMask(); computeExitField(); rebuildGuestSpots(); rebuildFences(); refreshVegetation(); computeViewMap(); }
 
 /* ================= camera + input ================= */
-const cam = { tx: 0, tz: 40, yaw: 0.5, pitch: 0.62, dist: 210, goal: { tx: 0, tz: 40, yaw: 0.5, pitch: 0.62, dist: 210 }, shake: 0, follow: null };
+/* v7 camera clipping: pull the camera in front of buildings and fence walls between it and its target (foliage and bark fade out near the camera instead) */
+const CAM_BOX = []; // [x0, y0, z0, x1, y1, z1]
+const BLD_H = { visitor: 12.2, hatchery: 7.2, ranger: 9, viewing: 7.6, food: 4.4, gift: 4.9, restroom: 3.7, meat: 7.4, plant: 3.4 }, FENCE_H = [2.3, 3.1, 5.2, 7.1];
+function rebuildCamObstacles(){ CAM_BOX.length = 0; camObsDirty = false;
+  for (const b of buildings.values()){ if (!b.mesh) continue; const y0 = b.mesh.position.y;
+    if (b.pen >= 0){ const x = b.mesh.position.x, z = b.mesh.position.z; CAM_BOX.push([x - 1.3, y0 - 2, z - 1.3, x + 1.3, y0 + (BLD_H[b.type] || 4), z + 1.3]); continue; }
+    const hw = b.w * TILE / 2 - 0.3, hd = b.h * TILE / 2 - 0.3; CAM_BOX.push([b.x - hw, y0 - 2, b.z - hd, b.x + hw, y0 + (BLD_H[b.type] || 5), b.z + hd]); }
+  if (gateMesh){ const g = gateMesh.position; for (const sd of [-1, 1]) CAM_BOX.push([g.x + sd * 5.2 - 1, g.y - 2, g.z - 1, g.x + sd * 5.2 + 1, g.y + 13.2, g.z + 1]); CAM_BOX.push([g.x - 6.7, g.y + 9.9, g.z - 0.8, g.x + 6.7, g.y + 11.6, g.z + 0.8]); }
+  for (const pen of pens.values()){ const x0 = eX(pen.i0), x1 = eX(pen.i1 + 1), z0 = eX(pen.j0), z1 = eX(pen.j1 + 1), t = pen.tier >= 3 ? 0.9 : 0.35; let top = -9;
+    for (let i = pen.i0; i <= pen.i1 + 1; i++) top = Math.max(top, H(eX(i), z0), H(eX(i), z1)); for (let j = pen.j0; j <= pen.j1 + 1; j++) top = Math.max(top, H(x0, eX(j)), H(x1, eX(j)));
+    const y1 = top + FENCE_H[pen.tier] + 0.3; CAM_BOX.push([x0 - t, -20, z0 - t, x1 + t, y1, z0 + t], [x0 - t, -20, z1 - t, x1 + t, y1, z1 + t], [x0 - t, -20, z0 - t, x0 + t, y1, z1 + t], [x1 - t, -20, z0 - t, x1 + t, y1, z1 + t]); } }
+function segBox(o, d, B){ let t0 = 0, t1 = 1;
+  for (let k = 0; k < 3; k++){ if (Math.abs(d[k]) < 1e-9){ if (o[k] < B[k] || o[k] > B[k + 3]) return 2; continue; } let ta = (B[k] - o[k]) / d[k], tb = (B[k + 3] - o[k]) / d[k]; if (ta > tb){ const q = ta; ta = tb; tb = q; } if (ta > t0) t0 = ta; if (tb < t1) t1 = tb; if (t0 > t1) return 2; }
+  return t0; }
+function camInsideSolid(x, y, z){ const m = 1.6; for (const B of CAM_BOX) if (x > B[0] - m && x < B[3] + m && z > B[2] - m && z < B[5] + m && y > B[1] - m && y < B[4] + m) return true; return false; }
+function cameraClearance(ax, ay, az, bx, by, bz){ // fraction of the target->camera segment that is free
+  if (camObsDirty) rebuildCamObstacles(); const dx = bx - ax, dy = by - ay, dz = bz - az, L = Math.hypot(dx, dy, dz) || 1; let best = 1; const o = [ax, ay, az], d = [dx, dy, dz];
+  const m = 1.6, E = [0, 0, 0, 0, 0, 0]; // only react when the camera itself would sit inside (or within m of) a solid: plain occlusion is left alone
+  for (const B of CAM_BOX){ if (bx < B[0] - m || bx > B[3] + m || bz < B[2] - m || bz > B[5] + m || by < B[1] - m || by > B[4] + m) continue;
+    if (ax > B[0] && ax < B[3] && az > B[2] && az < B[5] && ay > B[1] && ay < B[4]) continue;
+    E[0] = B[0] - m; E[1] = B[1] - m; E[2] = B[2] - m; E[3] = B[3] + m; E[4] = B[4] + m; E[5] = B[5] + m; const t = segBox(o, d, E); if (t < best) best = t; }
+  if (best >= 1) return 1; return clamp(best, Math.min(1, 4 / L), 1); }
+const cam = { tx: 0, tz: 40, clip: 1, yaw: 0.5, pitch: 0.62, dist: 210, goal: { tx: 0, tz: 40, yaw: 0.5, pitch: 0.62, dist: 210 }, shake: 0, follow: null };
 const title = { on: true };
 function focusOn(x, z, dist){ cam.goal.tx = x; cam.goal.tz = z; if (dist) cam.goal.dist = clamp(dist, 12, 330); }
 function updateCamera(dt){
@@ -1574,7 +1667,11 @@ function updateCamera(dt){
   cam.yaw += dy * (1 - Math.exp(-k * dt));
   const ty = Math.max(H(cam.tx, cam.tz), 0) + (cam.follow ? SPECIES_DATA[cam.follow.sp].size * 0.2 : 0.5);
   const cp = Math.cos(cam.pitch); let px = cam.tx + Math.sin(cam.yaw) * cp * cam.dist, pz = cam.tz + Math.cos(cam.yaw) * cp * cam.dist, py = ty + Math.sin(cam.pitch) * cam.dist;
-  const floor = Math.max(H(px, pz), 0) + 2.5; if (py < floor){ py = floor; }
+  if (!title.on && cam.dist < 140){ const cl = cameraClearance(cam.tx, ty, cam.tz, px, py, pz);
+    if (cl < cam.clip) cam.clip = cl; else { const c2 = damp(cam.clip, cl, 3, dt); cam.clip = camInsideSolid(cam.tx + (px - cam.tx) * c2, ty + (py - ty) * c2, cam.tz + (pz - cam.tz) * c2) ? cl : c2; } } // easing back out must not pass through a wall
+  else cam.clip = damp(cam.clip, 1, 3, dt);
+  if (cam.clip < 0.999){ px = cam.tx + (px - cam.tx) * cam.clip; pz = cam.tz + (pz - cam.tz) * cam.clip; py = ty + (py - ty) * cam.clip; }
+  const floor = Math.max(H(px, pz), 0) + 2.5; if (py < floor){ py = floor; } nearVegTick(dt);
   cam.shake = Math.max(0, cam.shake - dt * 1.5); const sh = cam.shake * cam.shake;
   camera.position.set(px + (rnd() - 0.5) * sh, py + (rnd() - 0.5) * sh, pz + (rnd() - 0.5) * sh); camera.lookAt(cam.tx, ty, cam.tz);
 }
@@ -1769,8 +1866,9 @@ function makeThumbs(){
 
 /* ================= quality ================= */
 function resize(){ const w = innerWidth, h = innerHeight; renderer.setPixelRatio(Math.min(DPR, QUALITY.pr[QUALITY.level])); renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w < h ? 55 : 45; camera.updateProjectionMatrix(); }
-function setQuality(l, manual){ QUALITY.level = l; setDinoQuality(l); if (manual) QUALITY.forced = true; const ms = QUALITY.shadow[l]; sun.shadow.mapSize.set(ms, ms); if (sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map = null; } shadowR = 0; resize(); refreshVegetation(); }
-window.addEventListener('resize', resize);
+function setQuality(l, manual){ QUALITY.level = l; setDinoQuality(l); if (manual) QUALITY.forced = true; const ms = QUALITY.shadow[l]; sun.shadow.mapSize.set(ms, ms); if (sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map = null; } shadowR = 0; resize(); refreshVegetation();
+  applyBuildingDetail(); applyFenceDetail(); applyGuestDetail(); curbIM.visible = detailHi(); }
+window.addEventListener('resize', resize); window.addEventListener('resize', () => placeToasts()); if (window.ResizeObserver){ const ro = new ResizeObserver(() => placeToasts()); for (const id of ['alert', 'coach']){ const el = document.getElementById(id); if (el) ro.observe(el); } } // re-stack when the banner or card changes size
 const PERF = { frames: 0, t0: 0, fps: 0, hist: [], lastStep: 0, ms: 0 };
 function perfTick(now, frameMs){ PERF.frames++; PERF.ms += frameMs; if (now - PERF.t0 >= 1000){ PERF.fps = PERF.frames * 1000 / (now - PERF.t0); PERF.cpu = PERF.ms / PERF.frames; PERF.frames = 0; PERF.ms = 0; PERF.t0 = now; PERF.hist.push(PERF.fps); if (PERF.hist.length > 4) PERF.hist.shift();
   if (!QUALITY.forced && QUALITY.level > 0 && PERF.hist.length >= 4 && now - PERF.lastStep > 6000 && !document.hidden){ const avg = PERF.hist.reduce((a, b) => a + b) / PERF.hist.length; if (avg < 45){ setQuality(QUALITY.level - 1); PERF.lastStep = now; PERF.hist = []; } }
@@ -1823,6 +1921,7 @@ window.__DP = {
   focus: focusOn, openSheet, closeSheet, setSpeed(s){ G.speed = s; }, setHour(h){ G.hour = h; }, setQuality, sim(sec){ let t = sec; while (t > 0){ const s = Math.min(t, 0.05); simulate(s); updateWild(s); t -= s; this._vt = (this._vt || 0) + s; if (this._vt >= 1){ this._vt = 0; computeViewMap(); } } }, tick(){ updateCamera(0.05); applyLighting(); renderer.render(scene, camera); },
   hourly(){ hourTick(); }, ready: false,
   get tool(){ return tool; }, get camera(){ return camera; }, groundAt(x, y){ return groundAtScreen(x, y); }, get undo(){ return undoRec; }, startTool, undoLast, tutorial(k){ showTutorial(k); }, get penMarkers(){ return penMarkers.length; }, guestNeeds, get bubbles(){ return bubbles.filter(b => b.s.visible).length; }, get penSpots(){ return penSpots; }, get ferry(){ return { pendingIn: FERRY.pendingIn, boats: FERRY.boats.map(b => ({ kind: b.slot.kind, state: b.state, t: +b.t.toFixed(1), x: +b.slot.mesh.position.x.toFixed(1), z: +b.slot.mesh.position.z.toFixed(1) })), waiting: waitingAtDock() }; }, onPier, walkH, advisor(){ return moneyAdvisor(); }, guestSpread(){ const gx = tX(GATE.i) + TILE / 2, gz = tZ(GATE.j); const w = guests.filter(g => !g.gone && g.state === 'walk'); const d = w.map(g => Math.hypot(g.x - gx, g.z - gz)); const f = x => d.length ? +(d.filter(v => v > x).length / d.length).toFixed(2) : 0; return { walking: w.length, over30m: f(30), over60m: f(60), over100m: f(100), maxM: Math.round(Math.max(0, ...d)) }; }, penWarn(id){ const p = pens.get(id); return !!p && (!!penWeak(p) || penBroken(p) || penMinCond(p) < 0.45 || penWorn(p)); }, heightAt(x, z){ return H(x, z); }, dailyUpkeep, guestThought, pickGuest, screenOfXZ(x, y, z){ const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight]; }, transferCheck(dId, pId){ return transferCheck(dinos.find(d => d.id === dId), pens.get(pId)); }, startTransfer(dId){ startTransfer(dinos.find(d => d.id === dId)); }, get tutK(){ return tutK; }, flowPerMin(){ return flowPerMin(); }, stars(){ G.stars = computeStars(); checkMissions(); return G.stars; }, get fling(){ return { ...fling }; }, serialize(){ return serialize(); }, load(){ return loadGame(); }, save(){ saveGame(); }, screenOf(i, j){ const v = new THREE.Vector3(tX(i), H(tX(i), tZ(j)), tZ(j)).project(camera); return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight]; }, tileType(i, j){ return tileType[idx(i, j)]; },
+  get v7(){ return { clip: cam.clip, curbs: curbIM.count, curbVis: curbIM.visible, grass: VEG.grass.ims[0].count, flower: VEG.flower.ims[0].count, shrub: VEG.shrub.ims[0].count, log: VEG.log.ims[0].count, guestHi: guestIM.geometry === GGEO[1], fenceHi: FENCE_IM[3].panel.geometry === FENCE_GEO[3][1].panel, bldHi: [...buildings.values()].every(b => b.mesh.userData.body.geometry === bldGeo(b.type, true)), camBoxes: CAM_BOX.length }; },
 };
 
 /* ================= init ================= */

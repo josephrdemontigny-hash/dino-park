@@ -22,30 +22,29 @@ const SPECIES = {
     size: 12, gait: 'biped', scaleF: 1.25, teeth: [13, 12], toothL: 0.13,
     nodes: [[-6.6,2.0,.03,.03,.03],[-5.8,2.25,.12,.14,.13],[-4.8,2.55,.23,.28,.27],[-3.7,2.86,.36,.44,.44],[-2.6,3.12,.5,.62,.64],[-1.4,3.32,.66,.82,.88],
       [-.3,3.4,.8,.94,1.06],[.85,3.34,.9,.98,1.34],[1.9,3.36,.84,.9,1.24],[2.75,3.58,.64,.7,.92],[3.4,3.88,.5,.56,.66],[3.9,4.1,.46,.52,.54],
-      [4.3,4.24,.52,.66,.46],[4.8,4.2,.42,.6,.4],[5.25,4.08,.31,.5,.32],[5.6,3.97,.22,.4,.26],[5.86,3.9,.12,.22,.12]],
-    pel: 6, chest: 8, head: 11,
+      [4.3,4.22,.6,.54,.52],[4.8,4.18,.46,.5,.44],[5.25,4.06,.31,.47,.33],[5.6,3.96,.21,.38,.26],[5.86,3.9,.11,.22,.12]],
+    pel: 6, chest: 8, head: 11, headTaper: .32,
     jaw: { hinge: [-.12, .3], pts: [[0,0,.47,.14,.42],[.42,-.1,.42,.13,.36],[.85,-.15,.33,.11,.27],[1.22,-.15,.23,.09,.19],[1.5,-.12,.1,.06,.08]] },
-    eye: { p: [.4, .3, .48], r: .068, gaze: [.82, .1, .56], pupil: 'slit', iris: '#c28a2c' },
+    eye: { p: [.42, .34, .5], r: .068, gaze: [.74, .08, .67], pupil: 'slit', iris: '#c28a2c' },
     legs: [
       { hind: true, at: [.66, 3.16, .15], j: [[0,0,0,.74],[0,-1.45,.55,.48],[0,-2.42,-.3,.23],[0,-3.0,.12,.17],[0,-3.07,.86,.075]], sx: [.78,.82,.9,1.1,1.2],
         thigh: [.06,-.45,.08, .52,.98,.78], calf: [0,-1.72,.12, .27,.46,.3], toes: { n: 3, spread: .36, len: [.82,1,.86] } },
       { arm: true, at: [.46, 2.82, 2.5], j: [[0,0,0,.12],[.08,-.4,.12,.09],[.08,-.56,.42,.06],[.08,-.58,.6,.03]], sx: [1,1,1,1], fingers: 2 }],
     col: { top: 0x463f31, belly: 0xb09c78, mark: 0x221c14, pat: 1, patF: 2.4, mouth: 0x6e2a26, claw: 0x221d17 },
     feat(P, c){ const { H, hb } = c;
-      P.ell(hb, [.4, H[1] + .1, H[0] + .42], [.15, .17, .3], { k: .12, mirror: true });
-      P.ell(hb, [.4, H[1] + .3, H[0] + .1], [.2, .26, .28], { k: .1, mirror: true });
-      P.ell(hb, [.4, H[1] + .5, H[0] + .42], [.15, .1, .3], { k: .06, mirror: true });
-      P.ell(hb, [.3, H[1] + .6, H[0] + .74], [.1, .11, .15], { k: .04, mirror: true });
-      P.ell(hb, [.15, H[1] + .5, H[0] + 1.05], [.07, .07, .26], { k: .04, mirror: true });
-      P.ell(hb, [0, H[1] + .36, H[0] + 1.3], [.13, .1, .5], { k: .1 });
-      P.ell(hb, [.25, H[1] + .02, H[0] + 1.05], [.08, .1, .5], { k: .1, mirror: true });
-      P.sub(hb, [.44, H[1] + .3, H[0] + .48], [.1, .08, .1], { k: .03, mirror: true });
+      P.ell(hb, [.5, H[1] - .04, H[0] + .42], [.17, .2, .4], { k: .14, mirror: true });
+      P.ell(hb, [.4, H[1] + .24, H[0] + .06], [.2, .26, .3], { k: .12, mirror: true });
+      P.ell(hb, [.36, H[1] + .5, H[0] + .44], [.13, .09, .24], { k: .06, mirror: true });
+      P.ell(hb, [.26, H[1] + .55, H[0] + .76], [.08, .08, .13], { k: .05, mirror: true });
+      P.ell(hb, [0, H[1] + .43, H[0] + 1.2], [.15, .07, .5], { k: .1, rot: [.46, 0, 0] });
+      P.ell(hb, [.26, H[1] + .02, H[0] + 1.05], [.1, .11, .52], { k: .1, mirror: true });
+      P.sub(hb, [.46, H[1] + .34, H[0] + .5], [.1, .08, .1], { k: .03, mirror: true });
       P.sub(hb, [.14, H[1] + .08, H[0] + 1.86], [.045, .035, .07], { k: .02, mirror: true });
     } },
   raptor: {
     size: 3.8, gait: 'biped', scaleF: 4, teeth: [11, 10], toothL: .028, quills: true,
     nodes: [[-2.3,.92,.02,.02,.02],[-1.9,.98,.045,.05,.05],[-1.45,1.02,.07,.08,.08],[-1.0,1.05,.1,.12,.12],[-.52,1.07,.14,.17,.17],
-      [0,1.08,.17,.2,.24],[.36,1.07,.19,.2,.27],[.7,1.1,.16,.16,.21],[.95,1.22,.12,.12,.13],[1.08,1.4,.095,.1,.1],[1.17,1.55,.09,.095,.07],
+      [0,1.08,.17,.2,.24],[.36,1.07,.19,.2,.27],[.7,1.1,.16,.16,.21],[.95,1.23,.15,.15,.17],[1.08,1.41,.125,.13,.135],[1.17,1.555,.104,.108,.088],
       [1.3,1.6,.085,.09,.052],[1.46,1.585,.068,.075,.044],[1.6,1.555,.05,.056,.036],[1.72,1.53,.022,.03,.02]],
     pel: 5, chest: 7, head: 10,
     jaw: { hinge: [-.035, .07], pts: [[0,0,.075,.03,.045],[.17,-.01,.062,.028,.034],[.33,-.016,.044,.024,.024],[.45,-.016,.02,.016,.012]] },
@@ -111,7 +110,7 @@ const SPECIES = {
       [-.8,4.82,1.34,1.12,1.42],[1.0,5.1,1.48,1.16,1.6],[2.7,5.6,1.38,1.06,1.5],[4.1,6.25,1.0,.9,1.08],[5.1,7.2,.66,.68,.72],[5.8,8.3,.5,.52,.54],
       [6.4,9.5,.4,.42,.43],[6.9,10.6,.33,.35,.35],[7.25,11.42,.29,.3,.3],
       [7.62,11.62,.32,.4,.26],[8.0,11.52,.29,.32,.22],[8.38,11.36,.21,.24,.16],[8.66,11.24,.09,.11,.07]],
-    pel: 5, chest: 7, head: 13,
+    pel: 5, chest: 7, head: 13, sleepNeck: 1.75, sleepHead: .55, sleepCurl: 1.3, sleepFoot: 1,
     jaw: { hinge: [-.02, .4], pts: [[0,0,.25,.08,.15],[.42,-.12,.22,.07,.12],[.8,-.24,.17,.06,.09],[1.02,-.3,.08,.035,.045]] },
     eye: { p: [.3, .3, .42], r: .06, gaze: [.95, .1, .3], pupil: 'round', iris: '#4a3218' },
     legs: [
@@ -139,7 +138,7 @@ const SPECIES = {
         thigh: [.04,-.35,.05, .4,.75,.58], toes: { n: 3, spread: .3, len: [.9,1,.9], hoof: true } },
       { front: true, at: [.55, 1.34, 2.4], j: [[0,0,0,.29],[.08,-.55,-.08,.2],[.1,-1.05,.05,.15],[.1,-1.28,.08,.17],[.1,-1.34,.28,.08]], sx: [.85,.9,.95,1.15,1.3],
         thigh: [.04,-.2,0, .24,.4,.3], toes: { n: 4, spread: .26, len: [.8,1,1,.8], hoof: true } }],
-    col: { top: 0x67663f, belly: 0xb2a680, mark: 0x3b3b25, pat: 0, patF: 1.1, mouth: 0x6e3a30, plate: 0x8c5634, plate2: 0x3a2418, horn: 0xd8ccae, beak: 0x2a241c, claw: 0x2a241c },
+    col: { top: 0x67663f, belly: 0xb2a680, mark: 0x3b3b25, pat: 0, patF: 1.1, mouth: 0x6e3a30, plate: 0x6e5c3e, plate2: 0x4a2c22, horn: 0xd8ccae, beak: 0x2a241c, claw: 0x2a241c },
     feat(P, c){ const { H, hb, F } = c;
       P.ell(hb, [.11, H[1] + .1, H[0] + .1], [.045, .03, .08], { k: .03, mirror: true });
       P.sub(hb, [.135, H[1] + .07, H[0] + .12], [.034, .03, .034], { k: .01, mirror: true });
@@ -241,7 +240,8 @@ function primDist(p, x, y, z){
     const ry = y - (p.ay + dy * t), rz = z - (p.az + dz * t);
     let uy = p.ua0 + (p.ub0 - p.ua0) * t, uz = p.ua1 + (p.ub1 - p.ua1) * t; const ul = Math.sqrt(uy * uy + uz * uz); uy /= ul; uz /= ul;
     const ly = ry * uy + rz * uz, lz = ry * p.dy + rz * p.dz;
-    const w = p.w0 + (p.w1 - p.w0) * t, hv = ly > 0 ? p.u0 + (p.u1 - p.u0) * t : p.d0 + (p.d1 - p.d0) * t;
+    let w = p.w0 + (p.w1 - p.w0) * t; const hv = ly > 0 ? p.u0 + (p.u1 - p.u0) * t : p.d0 + (p.d1 - p.d0) * t;
+    if (p.tpA || p.tpB){ const tp = p.tpA + (p.tpB - p.tpA) * t, bq = ly / hv; w *= 1 - tp * (bq > 1 ? 1 : bq < -1 ? -1 : bq); }
     let de;
     if (p.sq){ const a = x / w, b = ly / hv; const k0 = Math.sqrt(Math.sqrt(a * a * a * a + b * b * b * b)); de = (k0 - 1) * Math.min(w, hv) * .92; }
     else { const a = x / w, b = ly / hv, a2 = a / w, b2 = b / hv; const k0 = Math.sqrt(a * a + b * b), k1 = Math.sqrt(a2 * a2 + b2 * b2); de = k1 > 1e-9 ? k0 * (k0 - 1) / k1 : -Math.min(w, hv); }
@@ -285,7 +285,7 @@ class Builder {
   tube(a, b, A, B, sA, sB, opts = {}){
     const dy = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dy, dz) || 1e-6;
     const p = { t: 0, ay: a[0], az: a[1], by: b[0], bz: b[1], il2: 1 / (L * L), dy: dy / L, dz: dz / L, uy: dz / L, uz: -dy / L,
-      w0: A[0], u0: A[1], d0: A[2], w1: B[0], u1: B[1], d1: B[2], sA, sB, ua0: (opts.ua || [dz / L, -dy / L])[0], ua1: (opts.ua || [dz / L, -dy / L])[1], ub0: (opts.ub || [dz / L, -dy / L])[0], ub1: (opts.ub || [dz / L, -dy / L])[1], capA: !!opts.capA, capB: !!opts.capB, tau: L * .8, sq: !!opts.square, fold: opts.fold || 0, foldF: opts.foldF || 1, reg: 0 };
+      w0: A[0], u0: A[1], d0: A[2], w1: B[0], u1: B[1], d1: B[2], sA, sB, ua0: (opts.ua || [dz / L, -dy / L])[0], ua1: (opts.ua || [dz / L, -dy / L])[1], ub0: (opts.ub || [dz / L, -dy / L])[0], ub1: (opts.ub || [dz / L, -dy / L])[1], capA: !!opts.capA, capB: !!opts.capB, tau: L * .8, tpA: opts.tpA || 0, tpB: opts.tpB || 0, sq: !!opts.square, fold: opts.fold || 0, foldF: opts.foldF || 1, reg: 0 };
     const R = Math.max(A[0], A[1], A[2], B[0], B[1], B[2]) * (opts.square ? 1.1 : 1);
     p.bb = [-Math.max(A[0], B[0]) * 1.1, Math.min(a[0], b[0]) - R, Math.min(a[1], b[1]) - R, Math.max(A[0], B[0]) * 1.1, Math.max(a[0], b[0]) + R, Math.max(a[1], b[1]) + R];
     return p;
@@ -367,6 +367,8 @@ function buildSpecies(key){
   if (BUILT[key]) return BUILT[key];
   const S = SPECIES[key]; S.key = key; const N = S.nodes, sz = S.size / 12;
   S.hipH = S.legs[0].at[1]; S.quad = S.gait === 'quad'; S.carn = S.gait === 'biped';
+  // v7: lower jaw fills the upper jaw's outline so a closed mouth reads as a lip line, not a slit
+  if (!S._jawAdj){ S._jawAdj = true; const wf = S.carn ? .93 : 1, uf = S.carn ? 2.1 : 1.4; S.jaw.pts = S.jaw.pts.map(p => [p[0], p[1], p[2] * wf, p[3] * uf, p[4]]); }
   S.halfW = Math.max(...N.map(n => n[2]));
   const t0 = performance.now();
   // ---------- rig ----------
@@ -399,11 +401,11 @@ function buildSpecies(key){
   const make = (cell) => {
     const B = new Builder(); const margin = cell * 3;
     const F = { horn: B.reg(S.col.horn || 0xd8ccae, 0, .45), beak: B.reg(S.col.beak || 0x2a241c, 0, .4), crest: B.reg(S.col.crest || S.col.top, .35, .6), frill: B.reg(S.col.frill || S.col.top, .3, .65), osteo: B.reg(S.col.osteo || S.col.top, .35, .75) };
-    const body = B.group('add', 0); body.spine = true;
+    const body = B.group('add', 0); body.spine = true; const headTp = (s) => (S.headTaper || 0) * ss(S.head - 1, S.head + .4, s);
     const ups = samples.map((q, i) => { const a = samples[Math.max(0, i - 1)], b = samples[Math.min(samples.length - 1, i + 1)]; const dy = b[1] - a[1], dz = b[0] - a[0], l = Math.hypot(dy, dz) || 1; return [dz / l, -dy / l]; });
     for (let i = 0; i < samples.length - 1; i++){ const a = samples[i], b = samples[i + 1];
       const neck = a[5] > S.chest + .3 && a[5] < S.head - .1;
-      B.push(body, B.tube([a[1], a[0]], [b[1], b[0]], [a[2], a[3], a[4]], [b[2], b[3], b[4]], a[5], b[5], { square: S.square && a[5] > 1 && a[5] < S.head, fold: neck ? .006 * sz : 0, foldF: TAU / (.14 * sz), ua: ups[i], ub: ups[i + 1], capA: i === 0, capB: i === samples.length - 2 }), margin); }
+      B.push(body, B.tube([a[1], a[0]], [b[1], b[0]], [a[2], a[3], a[4]], [b[2], b[3], b[4]], a[5], b[5], { square: S.square && a[5] > 1 && a[5] < S.head, fold: neck ? .006 * sz : 0, foldF: TAU / (.14 * sz), ua: ups[i], ub: ups[i + 1], tpA: headTp(a[5]), tpB: headTp(b[5]), capA: i === 0, capB: i === samples.length - 2 }), margin); }
     for (const li of legInfo){ const { J, L, bones, side } = li; const g = B.group('add', (li.arm ? .05 : .14) * sz * (S.quad ? 1.5 : 1));
       for (let i = 0; i < J.length - 2; i++) B.push(g, B.cone(bones[i], bones[i + 1] ?? bones[i], J[i], J[i + 1], J[i][3], J[i + 1][3], { sx: L.sx[i] }), margin);
       if (L.thigh){ const t = L.thigh; B.push(g, B.ellp(bones[0], [J[0][0] + side * t[0], J[0][1] + t[1], J[0][2] + t[2]], [t[3], t[4], t[5]]), margin); }
@@ -446,6 +448,9 @@ function buildSpecies(key){
     return B; };
   // ---------- mesh with soft skin weights, regions, mouth colouring ----------
   const mouthCol = new THREE.Color(S.col.mouth);
+  const jawLen = S.jaw.pts[S.jaw.pts.length - 1][0];
+  const lipCol = new THREE.Color(S.col.top).lerp(new THREE.Color(S.col.mouth), .5).multiplyScalar(.6);
+  const jawAt = (z) => { const J = S.jaw.pts; const dz = z - hinge[2]; let k = 0; while (k < J.length - 2 && J[k + 1][0] < dz) k++; const f = clamp((dz - J[k][0]) / (J[k + 1][0] - J[k][0]), 0, 1); return J[k].map((v, i) => lerp(v, J[k + 1][i], f)); };
   const jawWidth = (z) => { const J = S.jaw.pts; const dz = z - hinge[2]; let k = 0; while (k < J.length - 2 && J[k + 1][0] < dz) k++; const f = clamp((dz - J[k][0]) / (J[k + 1][0] - J[k][0]), 0, 1); return lerp(J[k][2], J[k + 1][2], f); };
   const meshFrom = (B, res, isJaw) => {
     const { P, N: NN, idx } = res; const n = P.length / 3; const regs = B.regs;
@@ -456,11 +461,11 @@ function buildSpecies(key){
       let dmin = Infinity; for (let i = 0; i < prims.length; i++){ const p = prims[i], b = p.bb; if (p.t === 0 && p !== pick){ ds[i] = Infinity; continue; } if (x < b[0] || x > b[3] || y < b[1] || y > b[4] || z < b[2] || z > b[5]){ ds[i] = Infinity; continue; } const d = primDist(p, x, y, z); ds[i] = d; p._tt = p._t; if (d < dmin) dmin = d; }
       let cr2 = 0, cg = 0, cb = 0, cwt = 0, sk = 0, ro = 0, br = 0, wt = 0, bl = 0; const nyv = NN[v * 3 + 1];
       for (let i = 0; i < prims.length; i++){ const d = ds[i]; if (d === Infinity) continue; const p = prims[i]; const w = Math.exp(-(d - dmin) / p.sig); if (w < .01) continue;
-        if (isJaw){ acc.set(jawBone, (acc.get(jawBone) || 0) + w); bl += w * ss(.3, -.5, nyv); }
+        if (isJaw){ acc.set(jawBone, (acc.get(jawBone) || 0) + w); bl += w * ss(-.55, -.92, nyv) * (1 - ss(.45, .8, (z - hinge[2]) / jawLen)); }
         else if (p.t === 0){ const s = lerp(p.sA, p.sB, p._tt); const [bs, ws] = bodyW(s); for (let k = 0; k < bs.length; k++) acc.set(bs[k], (acc.get(bs[k]) || 0) + w * ws[k]);
           br += w * ss(S.pel - 1.6, S.pel - .3, s) * (1 - ss(S.chest + .2, S.chest + 1.2, s));
           const dy = p.by - p.ay, dz = p.bz - p.az, tt = p._tt; let uy = p.ua0 + (p.ub0 - p.ua0) * tt, uz = p.ua1 + (p.ub1 - p.ua1) * tt; const ul = Math.hypot(uy, uz); const ly = ((y - (p.ay + dy * tt)) * uy + (z - (p.az + dz * tt)) * uz) / ul;
-          const hv = ly > 0 ? lerp(p.u0, p.u1, tt) : lerp(p.d0, p.d1, tt); bl += w * ss(.05, -.7, ly / hv); }
+          const hv = ly > 0 ? lerp(p.u0, p.u1, tt) : lerp(p.d0, p.d1, tt); const hd = ss(S.head - .6, S.head + .3, s); bl += w * ss(lerp(.05, -.82, hd), lerp(-.7, -1.02, hd), ly / hv); }
         else { bl += w * ss(.15, -.75, nyv) * .85; const e = p.t === 1 && p.bones[1] !== p.bones[0] ? ss(.72, 1, p._tt) * p.blendEnd : 0;
           acc.set(p.bones[0], (acc.get(p.bones[0]) || 0) + w * (1 - e)); if (e > 0) acc.set(p.bones[1], (acc.get(p.bones[1]) || 0) + w * e); }
         const R = regs[p.reg || 0]; const wn = w * (1 - R.s) + 1e-9; cr2 += R.c.r * wn; cg += R.c.g * wn; cb += R.c.b * wn; cwt += wn; sk += R.s * w; ro += R.r * w; wt += w; }
@@ -468,16 +473,21 @@ function buildSpecies(key){
       for (let k = 0; k < 4; k++){ si[v * 4 + k] = top[k] ? top[k][0] : 0; sw[v * 4 + k] = top[k] ? top[k][1] / tw : 0; }
       wt = wt || 1; cwt = cwt || 1; col[v * 3] = cr2 / cwt; col[v * 3 + 1] = cg / cwt; col[v * 3 + 2] = cb / cwt; mask[v * 4] = sk / wt; mask[v * 4 + 1] = br / wt; mask[v * 4 + 2] = ro / wt; mask[v * 4 + 3] = bl / wt;
       const ny = NN[v * 3 + 1];
-      const tint = (k, c2, f) => { col[v * 3] = lerp(col[v * 3], c2.r * f, k); col[v * 3 + 1] = lerp(col[v * 3 + 1], c2.g * f, k); col[v * 3 + 2] = lerp(col[v * 3 + 2], c2.b * f, k); mask[v * 4] *= 1 - k; mask[v * 4 + 2] = lerp(mask[v * 4 + 2], .58, k); };
-      if (isJaw){ if (ny > .25 && z > hinge[2] - .02 * sz){ const jw = jawWidth(z); tint(ss(.25, .6, ny) * (1 - ss(jw * .55, jw * .8, Math.abs(x))), mouthCol, 1); } }
-      else if (z > hinge[2] - .05 * sz && ny < -.35){ const sp = spineAt(z); if (y < sp[1] && Math.abs(x) < sp[2] * .82) tint(ss(-.35, -.7, ny), mouthCol, .75); }
+      const tint = (k, c2, f, rgh = .58) => { const m0 = mask[v * 4], m1 = m0 * (1 - k), dn = Math.max(1e-4, 1 - m1), cs = [c2.r, c2.g, c2.b]; // keep the blend exact: mix(col', skin, m1) == mix(mix(col, skin, m0), c2, k)
+        for (let q = 0; q < 3; q++) col[v * 3 + q] = (col[v * 3 + q] * (1 - m0) * (1 - k) + cs[q] * f * k) / dn; mask[v * 4] = m1; mask[v * 4 + 2] = lerp(mask[v * 4 + 2], rgh, k); };
+      if (isJaw){ const ja = jawAt(z), yc = hinge[1] + ja[1], jw = ja[2]; mask[v * 4 + 1] = -.01;
+        if (ny > .25 && z > hinge[2] - .02 * sz) tint(ss(.25, .6, ny) * (1 - ss(jw * .4, jw * .66, Math.abs(x))), mouthCol, .55, .95);
+        if (z > hinge[2] - .02 * sz){ const rel = (y - yc) / Math.max(ja[3], 1e-3); const k = ss(.05, .6, rel) * (1 - ss(.5, .85, ny)) * (1 - ss(jw * .2, jw * .45, jw - Math.abs(x))) * .75; if (k > .01) tint(k, lipCol, 1, .96); } }
+      else if (z > hinge[2] - .05 * sz){ const sp = spineAt(z); const yl = sp[1] - sp[4], rel = (y - yl) / sp[4];
+        if (ny < -.35 && y < sp[1] && Math.abs(x) < sp[2] * .62) tint(ss(-.35, -.7, ny), mouthCol, .5, .95);
+        else if (rel > -.15 && rel < .4 && ny > -.97){ const k = (1 - ss(.06, .3, rel)) * .45; if (k > .01) tint(k, lipCol, 1, .9); } }
       if (!isJaw){ const zz = z - hinge[2]; if (zz > -.6 * sz && zz < .1 * sz && y < hinge[1] - .02 * sz){ const k = ss(-.6 * sz, -.1 * sz, zz) * .45; if (k > .02){ for (let q = 0; q < 4; q++) sw[v * 4 + q] *= 1 - k; let slot = 0; for (let q = 1; q < 4; q++) if (sw[v * 4 + q] < sw[v * 4 + slot]) slot = q; if (sw[v * 4 + slot] > 0 && si[v * 4 + slot] !== jawBone){ /* merge smallest into largest */ sw[v * 4] += sw[v * 4 + slot]; } si[v * 4 + slot] = jawBone; sw[v * 4 + slot] = k; } } }
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(NN, 3)); g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
     g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('aMask', new THREE.BufferAttribute(mask, 4)); g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
     g.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1)); return g;
   };
-  const cellHi = S.size / 112, cellLo = S.size / 46;
+  const cellHi = S.size / 112, cellLo = S.size / (S.size < 7 ? 60 : 46); // slim snouts need a finer far mesh
   const hiB = make(cellHi), loB = make(cellLo);
   const bodyHi = meshFrom(hiB, surfaceNets(hiB.groups, cellHi)), bodyLo = meshFrom(loB, surfaceNets(loB.groups, cellLo));
   const jB = makeJaw(cellHi * .8), jawHi = meshFrom(jB, surfaceNets(jB.groups, cellHi * .8), true); const jBl = makeJaw(cellLo), jawLo = meshFrom(jBl, surfaceNets(jBl.groups, cellLo), true);
@@ -486,7 +496,7 @@ function buildSpecies(key){
   const hi = mergeGeometries([mergeGeometries([bodyHi, jawHi, ...ex.hi], false), eyes], true);
   const lo = mergeGeometries([mergeGeometries([bodyLo, jawLo, ...ex.lo], false), eyes], true);
   for (const g of [hi, lo]){ g.computeBoundingSphere(); g.boundingSphere.radius *= 1.25; }
-  const out = { S, rig, legInfo, jawBone, eyeBones, hi, lo, buildMs: performance.now() - t0, tris: { hi: hi.index.count / 3, lo: lo.index.count / 3 } };
+  const out = { S, rig, legInfo, jawBone, eyeBones, hi, lo, buildMs: performance.now() - t0, tris: { hi: hi.index.count / 3, lo: lo.index.count / 3 }, counts: { body: bodyHi.attributes.position.count, jaw: jawHi.attributes.position.count } };
   BUILT[key] = out; return out;
 }
 
@@ -516,7 +526,7 @@ function buildExtras(S, c){
     for (const sd of [1, -1]){
       for (let i = 0; i < nu; i++){ const t = i / (nu - 1); const z = lerp(z0, z1, t); const sp = spineAt(z); const yl = sp[1] - sp[4] * .8; const xl = sp[2] * .6 * .97;
         const L = S.toothL * (1.1 - Math.abs(t - .35) * .7);
-        hi.push(rigid(place(curvedCone(L, L * .2, -.25, 5, 3), [sd * xl, yl + L * .4, z], [0, -1, 0], [0, 0, 1]), 0xffffff, hb, .3, (v) => ivory.clone().lerp(stain, clamp((v.y - (yl - L * .6)) / L, 0, 1)))); }
+        hi.push(rigid(place(curvedCone(L, L * .2, -.25, 5, 3), [sd * xl, yl + L * .62, z], [0, -1, 0], [0, 0, 1]), 0xffffff, hb, .3, (v) => ivory.clone().lerp(stain, clamp((v.y - (yl - L * .6)) / L, 0, 1)))); }
       const J = S.jaw.pts, jl = J[J.length - 1][0];
       for (let i = 0; i < nl; i++){ const t = .1 + .82 * i / (nl - 1); const dz = jl * t; let k = 0; while (k < J.length - 2 && J[k + 1][0] < dz) k++; const f = (dz - J[k][0]) / (J[k + 1][0] - J[k][0]);
         const w = lerp(J[k][2], J[k + 1][2], f), up = lerp(J[k][3], J[k + 1][3], f), dy = lerp(J[k][1], J[k + 1][1], f); const L = S.toothL * .75 * (1.1 - Math.abs(t - .4) * .7);
@@ -525,8 +535,8 @@ function buildExtras(S, c){
     for (const e of li.tips){ const base = li.arm ? li.J[2] : ball; const d = [e[0] - base[0], e[1] - base[1], e[2] - base[2]]; const dl = Math.hypot(...d);
       const L = li.arm ? dl * .42 : hoof ? Math.max(ball[3] * .5, dl * .22) : dl * .3; const r = li.arm ? L * .2 : hoof ? L * .5 : L * .24;
       const g = curvedCone(L, r, hoof ? -.15 : -.5, 6, 3); place(g, [e[0] - d[0] / dl * L * .3, e[1] - (hoof ? r * .5 : L * .05), e[2] - d[2] / dl * L * .3], [d[0] / dl, hoof ? -.35 : -.12, d[2] / dl], [0, 1, 0]);
-      both(rigid(g, claw, li.arm ? li.bones[2] : fb, .35)); }
-    if (li.L.sickle){ const g = curvedCone(.1, .018, -1.0, 6, 5); place(g, [ball[0] - li.side * .012, ball[1] + .03, ball[2] + .01], [0, .7, .7], [0, .3, 1]); both(rigid(g, claw, fb, .3)); } }
+      const cg = rigid(g, claw, li.arm ? li.bones[2] : fb, .35); hi.push(cg); if (S.size >= 7) lo.push(cg); } // small species: far mesh toes are too thin to hold claws
+    if (li.L.sickle){ const g = curvedCone(.1, .018, -1.0, 6, 5); place(g, [ball[0] - li.side * .012, ball[1] + .03, ball[2] + .01], [0, .7, .7], [0, .3, 1]); hi.push(rigid(g, claw, fb, .3)); } }
   if (S.key === 'trike'){ const hcol = (v) => new THREE.Color(S.col.horn).lerp(new THREE.Color(0x3a3024), clamp((v.y - H[1] - .8) * .9, 0, 1) * .7);
     for (const sd of [1, -1]){ const g = curvedCone(1.05, .12, .22, 10, 6); place(g, [sd * .27, H[1] + .48, H[0] + .48], [sd * .12, .62, .78], [0, 1, -.2]); both(rigid(g, S.col.horn, hb, .4, hcol)); }
     const g = curvedCone(.38, .1, .12, 10, 4); place(g, [0, H[1] + .22, H[0] + 1.15], [0, .9, .44], [0, 0, 1]); both(rigid(g, S.col.horn, hb, .4, hcol));
@@ -578,9 +588,20 @@ const SKIN_COLOR = `
   vec3 tp = vRP * uScale;
   vec4 sk = texture2D(uSkin, tp.zy) * tw.x + texture2D(uSkin, tp.xz) * tw.y + texture2D(uSkin, tp.xy) * tw.z;
   float dH = sk.r;
+#ifdef DINO_HI
+  { // v7 close-up scales: big tubercle rosettes on back and flanks, transverse scutes on the belly, both only when near
+    float nr = 1.0 - smoothstep(0.02, 0.08, length(fwidth(tp)));
+    vec3 tb = tp * 0.34 + 0.37;
+    vec4 sk2 = texture2D(uSkin, tb.zy) * tw.x + texture2D(uSkin, tb.xz) * tw.y + texture2D(uSkin, tb.xy) * tw.z;
+    float tub = smoothstep(0.35, 0.9, sk2.r) * (1.0 - vMask.w) * smoothstep(-0.3, 0.5, vRN.y);
+    dH = mix(dH, max(dH, tub * 1.05), 0.55 * nr);
+    float fz = fract(vRP.z * uScale * 1.6 + sk.b * 0.25); float scute = smoothstep(0.0, 0.1, fz) * (1.0 - smoothstep(0.82, 1.0, fz));
+    dH = mix(dH, dH * 0.35 + scute * 0.65, smoothstep(0.5, 0.9, vMask.w) * smoothstep(-0.2, -0.7, vRN.y) * nr);
+  }
+#endif
   vec3 q = vRP / uSize * 6.0 + uPat.zwz;
   float belly = vMask.w;
-  float dorsal = smoothstep(0.6, 0.97, vRN.y);
+  float dorsal = smoothstep(0.6, 0.97, vRN.y) * smoothstep(-0.01, 0.0, vMask.y); // jaw vertices carry a tiny negative breath flag: no dorsal stripe on the lip
   float warp = dfbm(q * 1.3); float m = 0.0;
   if (uPat.x < 0.5) m = smoothstep(0.5, 0.68, dfbm(q * 1.1 * uPat.y + 2.0)) * 0.85;
   else if (uPat.x < 1.5) m = smoothstep(0.42, 0.85, sin(q.z * 3.0 * uPat.y + warp * 5.0 + q.y * 0.8) * 0.5 + 0.5 + (dfbm(q * 1.9 + 4.0) - 0.5) * 0.9) * smoothstep(-0.2, 0.45, vRN.y) * 0.8;
@@ -591,13 +612,14 @@ const SKIN_COLOR = `
   skin = mix(skin, uMark, dorsal * 0.35);
   skin *= 0.88 + 0.24 * dfbm(q * 0.45 + 9.0);
   float fwT = length(fwidth(tp)); float near = 1.0 - smoothstep(0.012, 0.045, fwT);
-  skin *= mix(1.0, mix(0.78, 1.06, sk.g), near);
+  skin *= mix(1.0, mix(0.72, 1.07, min(sk.g, 0.35 + dH)), near);
   skin = mix(skin, skin * vec3(1.06, 1.03, 0.95), smoothstep(0.6, 0.95, dH) * 0.5 * near);
   diffuseColor.rgb = mix(vColor.rgb, skin, vMask.x);
 `;
 function makeSkin(S, U, hi){
   const Mat = hi ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
   const mat = new Mat({ vertexColors: true, roughness: .7, metalness: 0 });
+  if (hi) mat.defines = { DINO_HI: '' };
   if (hi){ mat.sheen = .3; mat.sheenRoughness = .55; mat.sheenColor = new THREE.Color(U.uBelly.value).multiplyScalar(.45); }
   mat.onBeforeCompile = (sh) => { Object.assign(sh.uniforms, U);
     sh.vertexShader = SKIN_VERT + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n transformed += normal * aMask.y * uBreath; vRP = position; vRN = normal; vMask = aMask;');
@@ -638,7 +660,7 @@ export class Dino {
     const rnd = mulberry(opts.seed ?? ((Math.random() * 1e9) | 0)); this.rnd = rnd;
     const jit = (hex, h, l) => { const c = new THREE.Color(hex); c.offsetHSL((rnd() - .5) * h, (rnd() - .5) * .06, (rnd() - .5) * l); return c; };
     this.U = { uSkin: { value: skinTexture() }, uTop: { value: jit(S.col.top, .04, .07) }, uBelly: { value: jit(S.col.belly, .03, .06) }, uMark: { value: jit(S.col.mark, .03, .05) },
-      uPat: { value: new THREE.Vector4(S.col.pat, S.col.patF * (.9 + rnd() * .2), rnd() * 40, rnd() * 40) }, uScale: { value: S.scaleF }, uBump: { value: .3 / (26 * S.scaleF) }, uSize: { value: S.size }, uBreath: { value: 0 } };
+      uPat: { value: new THREE.Vector4(S.col.pat, S.col.patF * (.9 + rnd() * .2), rnd() * 40, rnd() * 40) }, uScale: { value: S.scaleF }, uBump: { value: .42 / (26 * S.scaleF) }, uSize: { value: S.size }, uBreath: { value: 0 } };
     this.matHi = makeSkin(S, this.U, true); this.matLo = makeSkin(S, this.U, false); const eye = eyeMaterial(S);
     this.meshHi = new THREE.SkinnedMesh(B.hi, [this.matHi, eye]); this.meshLo = new THREE.SkinnedMesh(B.lo, [this.matLo, eye]); this._loMats = [this.matLo, eye]; this._invMats = [INVIS, INVIS];
     const rootBone = bones[S.pel]; this.root.add(rootBone); this.root.add(this.meshHi); this.root.add(this.meshLo); this.root.updateMatrixWorld(true);
@@ -655,7 +677,7 @@ export class Dino {
       return { li, n, restDir, alpha0, mt, toe, ball: new THREE.Vector3(ball[0], ball[1], ball[2]), off: li.side > 0 ? 0 : .5, hipH: J[0][1], knee: li.front ? -1 : 1 }; });
     this.maxStance = .9 * Math.min(...this.legs.filter(l => !l.li.arm).map(l => l.hipH));
     { let lo = Infinity; for (let i = Math.max(0, S.pel - 1); i <= S.chest; i++) lo = Math.min(lo, S.nodes[i][1] - S.nodes[i][4]); this.sleepDrop = Math.max(0, lo - .025 * S.size); }
-    this.phase = rnd() * TAU; this.cyc = rnd(); this.t = rnd() * 10; this.action = null; this.actT = 0; this.actDur = 1; this.sleep = 0;
+    this.sleepSide = rnd() < .5 ? -1 : 1; this.phase = rnd() * TAU; this.cyc = rnd(); this.t = rnd() * 10; this.action = null; this.actT = 0; this.actDur = 1; this.sleep = 0;
     this.mv = 0; this.run = 0; this.lookY = 0; this.lookX = 0; this.lookTarget = null; this._lookGoal = [0, 0]; this._lookT = 0; this.blinkT = 1 + rnd() * 3; this.blink = 0; this.exert = 0;
   }
   get tris(){ return this.near ? this.B.tris.hi : this.B.tris.lo; }
@@ -680,17 +702,17 @@ export class Dino {
     this.exert = clamp(this.exert + (run > .5 ? dt * .2 : -dt * .04), 0, 1);
     // pelvis: bob (vaulting walk / bouncing run), weight shift onto the stance leg, hip yaw, lean into speed
     const pel = bones[S.pel]; const biped = !S.quad;
-    const bob = lerp(Math.cos(TAU * 2 * (c - duty * .5)) * h * .016, -Math.cos(TAU * 2 * (c - duty * .5)) * h * .045, run) * mv;
+    const bob = lerp(Math.cos(TAU * 2 * (c - duty * .5)) * h * .016, -Math.cos(TAU * 2 * (c - duty * .5)) * h * (biped ? .075 : .05), run) * mv;
     const breath = Math.sin(t * lerp(1.0, 2.6, this.exert) * (6 / Math.sqrt(S.size + 4)));
-    const drop = sl * this.sleepDrop;
+    const drop = sl * this.sleepDrop; const slTail = .075, sSide = this.sleepSide;
     pel.position.y += bob - drop; pel.position.x += Math.sin(TAU * c) * h * .022 * mv * (biped ? 1 : .4);
-    const lean = (biped ? (.03 + .09 * run) : .02 * run) * mv; const roll = Math.sin(TAU * c) * (biped ? .035 : .018) * mv - turn * speed * .01 + sl * .07;
+    const lean = (biped ? (.03 + .17 * run) : .03 * run) * mv + (biped ? Math.cos(TAU * 2 * (c - duty * .5)) * .025 * run * mv : 0); const roll = Math.sin(TAU * c) * (biped ? .035 : .018) * mv - turn * speed * .01 + sl * .07 * sSide;
     const pelYaw = Math.sin(TAU * c) * .045 * mv - turn * .05;
     _eu.set(lean, pelYaw, roll); pel.quaternion.setFromEuler(_eu);
     // tail: delayed counter-sway, straightens when running, droops to the ground asleep
     for (let i = 0; i < S.pel; i++){ const k = (S.pel - i) / S.pel; const b = bones[i];
       const sway = -Math.sin(TAU * c - (S.pel - i) * .45) * .06 * mv * (.4 + k) + Math.sin(t * .55 + i * .5) * .035 * (1 - mv) * (1 - sl);
-      b.rotation.set(run * .012 * mv - sl * .075 + breath * .002, sway - turn * .1 * (.3 + k) - pelYaw * .4, 0); }
+      b.rotation.set(run * (biped ? -.02 : .012) * mv - sl * slTail + breath * .002 + (biped ? Math.cos(TAU * 2 * c - (S.pel - i) * .5) * .018 * run * mv : 0), sway - turn * .1 * (.3 + k) - pelYaw * .4 + sl * sSide * .1 * (.4 + k), 0); }
     // head & neck
     let headDown = 0, headUp = 0, jaw = 0, lunge = 0, tremor = 0;
     if (act === 'eat'){ const e = ss(0, .15, at) * (1 - ss(.85, 1, at)); headDown = e; if (biped){ jaw = (Math.sin(t * 7) * .5 + .5) * .45 * e; lunge = Math.max(0, Math.sin(t * 3.5)) * .3 * e; } else jaw = (Math.sin(t * 9) * .5 + .5) * .22 * e; }
@@ -704,10 +726,10 @@ export class Dino {
     const nn = S.head - S.chest;
     for (let i = S.pel + 1; i <= S.head; i++){ const b = bones[i];
       if (i <= S.chest){ b.rotation.set(breath * .004 + lunge * .02, -pelYaw * .6, -roll * .5); continue; }
-      const share = 1 / nn;
-      const rx = share * (headDown * (S.key === 'brachio' ? 1.3 : .95) - headUp * .55 + sl * (S.key === 'brachio' ? 1.1 : .6) - lean - bob / h * 2 + lunge * .25 + this.lookX)
-        + (i === S.head ? -lunge * .35 + headUp * .2 : 0) + Math.sin(t * 40) * .006 * tremor;
-      b.rotation.set(rx, share * (this.lookY + turn * .25 + pelYaw * .8), share * -roll * .6); }
+      const share = 1 / nn, kk = i - S.chest - 1, wd = 2 * (nn - kk) / (nn * (nn + 1)); // sleeping necks bend most at the base
+      const rx = share * (headDown * (S.key === 'brachio' ? 1.3 : .95) - headUp * .55 - lean - bob / h * 2 + lunge * .25 + this.lookX) + sl * (S.sleepNeck ?? .6) * wd
+        + (i === S.head ? -lunge * .35 + headUp * .2 - sl * (S.sleepHead || 0) : 0) + Math.sin(t * 40) * .006 * tremor + (biped && i === S.head ? -run * .12 * mv : 0);
+      b.rotation.set(rx, share * (this.lookY + turn * .25 + pelYaw * .8 + sl * sSide * (S.sleepCurl ?? .35)), share * -roll * .6); }
     bones[S.chest].position.z += lunge * .05 * S.size / 6;
     bones[this.B.jawBone].rotation.x = jaw * (S.key === 'trex' ? .62 : S.quad ? .35 : .5);
     this.blinkT -= dt; if (this.blinkT < 0){ this.blink += dt / .08; if (this.blink >= 2){ this.blink = 0; this.blinkT = 2 + this.rnd() * 5; } }
@@ -721,12 +743,13 @@ export class Dino {
       if (li.arm){ const sd = li.side; const sw = Math.sin(TAU * c + (sd > 0 ? 0 : Math.PI)) * .12 * mv;
         bones[bs[0]].rotation.set(-.15 + sw - jaw * .25 + sl * .3 + Math.sin(t * 1.3 + sd) * .03, 0, sd * .05); bones[bs[1]].rotation.set(-.2 - jaw * .3 - run * .3, 0, 0); bones[bs[2]].rotation.set(.1 + jaw * .2, 0, 0); continue; }
       let off = Lg.off; if (li.front) off = li.side > 0 ? lerp(.25, .5, trot * run) : lerp(.75, 1.0, trot * run);
-      const ph = (c + off) % 1; let zoff, lift = 0, push = 0, curl = 0; const legH = Lg.hipH; const liftH = Math.min(.2 * legH, .07 * legH + .25 * A) * mv;
+      const ph = (c + off) % 1; let zoff, lift = 0, push = 0, curl = 0; const legH = Lg.hipH; const liftH = lerp(Math.min(.2 * legH, .07 * legH + .25 * A), (biped ? .4 : .26) * legH, run) * mv;
       if (ph < duty){ const u = ph / duty; zoff = A * (.5 - u); push = ss(.55, 1, u); }
-      else { const u = (ph - duty) / (1 - duty); const e = u * u * (3 - 2 * u); zoff = A * (-.5 + e); lift = liftH * Math.sin(Math.PI * u); curl = Math.sin(Math.PI * u); push = 1 - ss(0, .35, u); }
+      else { const u = (ph - duty) / (1 - duty); const e = u * u * (3 - 2 * u); zoff = A * (-.5 + e); lift = liftH * Math.sin(Math.PI * Math.pow(u, lerp(1, .75, run))); curl = Math.sin(Math.PI * u) * (1 + run * .6); push = 1 - ss(0, .35, u);
+        if (run > .05){ const kick = Math.sin(Math.PI * clamp(u / .55, 0, 1)) * run; zoff -= A * .22 * kick; lift += liftH * .25 * kick; } }
       zoff *= mv;
       const b0 = bones[bs[0]]; _mA.multiplyMatrices(_inv, b0.parent.matrixWorld); _qp.setFromRotationMatrix(_mA); _p0.copy(b0.position).applyMatrix4(_mA);
-      _B.copy(Lg.ball); _B.z += zoff + sl * (li.front ? -.12 : .1) * legH; _B.y += lift;
+      _B.copy(Lg.ball); _B.z += zoff + sl * (li.front ? -(S.sleepFoot ? .3 : .12) : (S.sleepFoot ? .32 : .1)) * legH; _B.x += sl * li.side * (S.sleepFoot || 0) * .25 * legH; _B.y += lift;
       const alpha = Lg.alpha0 + push * .5 * mv * (li.front ? .6 : 1) + curl * .25 * mv + sl * ((li.front ? .9 : 1.42) - Lg.alpha0);
       _A.set(_B.x, _B.y + Lg.mt * Math.cos(alpha), _B.z - Lg.mt * Math.sin(alpha));
       const L1 = li.len[0], L2 = li.len[1]; _d.subVectors(_A, _p0); let dd = _d.length(); const dmax = (L1 + L2) * .999, dmin = Math.abs(L1 - L2) + 1e-3;
