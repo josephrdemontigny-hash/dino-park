@@ -236,10 +236,10 @@ export function fenceGeos(tier){
   return { post, panel, mesh };
 }
 export const FENCE_TIERS = [
-  { name: 'Wooden', str: 2.0, cost: 60, upkeep: 2, decay: 0.008, color: '#8a6a44', desc: 'Cheap timber rails. Small herbivores only.' },
-  { name: 'Chain-link', str: 3.5, cost: 140, upkeep: 3, decay: 0.005, color: '#9aa09c', desc: 'Steel mesh. Mid-size herbivores, Dilophosaurus.' },
-  { name: 'Electric', str: 5.5, cost: 320, upkeep: 14, decay: 0.004, color: '#f2c230', desc: '10,000 volts. Raptors, Triceratops, sauropods.' },
-  { name: 'Reinforced Concrete', str: 8.5, cost: 700, upkeep: 6, decay: 0.002, color: '#b9b4a8', desc: 'Six-metre walls. Built for a T. rex.' },
+  { name: 'Wooden', str: 2.0, cost: 60, upkeep: 2, decay: 0.005, color: '#8a6a44', desc: 'Cheap timber rails. Small herbivores only.' },
+  { name: 'Chain-link', str: 3.5, cost: 140, upkeep: 3, decay: 0.0032, color: '#9aa09c', desc: 'Steel mesh. Triceratops and other mid-size herbivores, Dilophosaurus.' },
+  { name: 'Electric', str: 5.5, cost: 320, upkeep: 14, decay: 0.0026, color: '#f2c230', desc: '10,000 volts. Raptors and sauropods.' },
+  { name: 'Reinforced Concrete', str: 8.5, cost: 700, upkeep: 6, decay: 0.0013, color: '#b9b4a8', desc: 'Six-metre walls. Built for a T. rex.' },
 ];
 
 /* ---------------- guests ---------------- */

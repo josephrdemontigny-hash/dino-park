@@ -185,12 +185,17 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .dots i.d{background:var(--amber)} .dots i.on{background:var(--amber2);width:18px;border-radius:4px}
 #coach{position:absolute;left:calc(var(--sal) + 10px);right:calc(var(--sar) + 10px);top:calc(var(--sat) + 112px);z-index:7;border-radius:16px;padding:10px 12px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:box-shadow .3s}
 #coach.ok{box-shadow:0 0 0 2px var(--ok)}
+#coach.mini{pointer-events:none;padding:6px 12px;opacity:.92} #coach.mini .ct span,#coach.mini .cb,#coach.mini .dots{display:none} #coach.mini .ct b{font-size:14px}
 #coach .ct b{display:flex;align-items:center;gap:6px;font-family:var(--serif);font-size:17px}
 #coach .ct b svg.i{width:18px;height:18px;color:var(--ok)}
 #coach .ct span{display:block;font-size:13px;line-height:1.4;color:var(--bone);margin-top:2px}
 #coach .cb{display:flex;gap:8px;margin-top:8px} #coach .cb .btn{flex:1 1 0;min-height:36px;font-size:13px}
 #modal .tips .tip{padding:8px 0;border-bottom:1px solid var(--line)} #modal .tips .tip b{display:block;font-size:14px;margin-bottom:2px} #modal .tips .tip span{font-size:13px;line-height:1.45;color:var(--bone)}
 #tut .dots{justify-content:flex-start}
+#cGuests{cursor:pointer}
+#modal .advisor{margin-top:12px;padding:10px 12px;border-radius:14px;background:rgba(242,194,48,.12);border:1px solid rgba(242,194,48,.45)} #modal .advisor b{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#f2c230;margin-bottom:3px} #modal .advisor span{font-size:14px;line-height:1.4}
+#sheet .need{padding:8px 0;border-bottom:1px solid var(--line)} #sheet .need b{display:block;font-size:14px} #sheet .need span{font-size:13px;line-height:1.4;color:var(--bone)}
+#sheet .thought{background:rgba(255,250,238,.1);border:1px solid var(--line);border-radius:14px;padding:8px 12px;font-size:14px;margin:0 0 10px;font-style:italic}
 /* landscape: dock becomes a left rail, sheets sit beside it */
 @media (orientation:landscape) and (max-height:560px){
   #dock{left:calc(var(--sal) + 8px);right:auto;top:calc(var(--sat) + 8px);bottom:calc(var(--sab) + 8px);flex-direction:column;width:72px;padding:5px}
