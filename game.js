@@ -30,7 +30,7 @@ const SAVE_KEY = 'primeval-park-v1';
 const QS = new URLSearchParams(location.search);
 
 const SPECIES = {
-  para:    { name: 'Parasaurolophus', short: 'Parasaurolophus', diet: 'plant', str: 1.0, appeal: 22, cost: 14000, hatch: 25, space: 10, group: [2, 8], stars: 0, walk: 2.2, run: 7, darts: 1, feed: 250, desc: 'Gentle herd animal with a trumpet crest.' },
+  para:    { name: 'Parasaurolophus', short: 'Parasaurolophus', diet: 'plant', str: 1.0, appeal: 28, cost: 14000, hatch: 25, space: 10, group: [2, 8], stars: 0, walk: 2.2, run: 7, darts: 1, feed: 250, desc: 'Gentle herd animal with a trumpet crest.' },
   trike:   { name: 'Triceratops', short: 'Triceratops', diet: 'plant', str: 3.5, appeal: 36, cost: 32000, hatch: 35, space: 14, group: [1, 4], stars: 0, walk: 2.0, run: 6, darts: 3, feed: 400, desc: 'Three horns, one bad temper. Charges fences.' },
   stego:   { name: 'Stegosaurus', short: 'Stegosaurus', diet: 'plant', str: 2.0, appeal: 30, cost: 24000, hatch: 30, space: 12, group: [1, 5], stars: 1, walk: 1.7, run: 4, darts: 2, feed: 350, desc: 'Plated and slow. A crowd favourite.' },
   dilo:    { name: 'Dilophosaurus', short: 'Dilophosaurus', diet: 'meat', str: 2.5, appeal: 42, cost: 38000, hatch: 35, space: 8, group: [1, 4], stars: 1, walk: 2.4, run: 8, darts: 2, feed: 600, desc: 'Crested hunter. Small, quick and spiteful.' },
@@ -42,7 +42,7 @@ const SPECIES = {
 const SP_KEYS = ['para', 'trike', 'stego', 'dilo', 'ankylo', 'raptor', 'brachio', 'trex'];
 const BUILD = {
   path:     { name: 'Footpath', cost: 150, desc: 'Guests walk on paths. Tap point to point.', stars: 0 },
-  hatchery: { name: 'Hatchery', cost: 60000, upkeep: 2200, desc: 'Incubates dinosaur eggs. Two at a time.', stars: 0 },
+  hatchery: { name: 'Hatchery', cost: 60000, upkeep: 1000, desc: 'Incubates dinosaur eggs. Two at a time.', stars: 0 },
   ranger:   { name: 'Ranger Station', cost: 40000, upkeep: 2400, desc: 'Maintains nearby fences. Cheaper, faster containment.', stars: 0 },
   food:     { name: 'Food Stand', cost: 9000, upkeep: 500, desc: 'Burgers and drinks. Must face a path.', stars: 0 },
   restroom: { name: 'Restrooms', cost: 6000, upkeep: 300, desc: 'Keeps guests comfortable. Must face a path.', stars: 0 },
@@ -50,7 +50,7 @@ const BUILD = {
   viewing:  { name: 'Viewing Platform', cost: 12000, upkeep: 150, desc: 'Raises the appeal of nearby enclosures.', stars: 1 },
   meat:     { name: 'Meat Feeder', cost: 8000, upkeep: 200, desc: 'Place inside an enclosure. Feeds carnivores.', stars: 0, inPen: true },
   plant:    { name: 'Plant Feeder', cost: 5000, upkeep: 120, desc: 'Place inside an enclosure. Feeds herbivores.', stars: 0, inPen: true },
-  visitor:  { name: 'Visitor Centre', cost: 0, upkeep: 800, desc: 'Food, restrooms and souvenirs.', stars: 0, fixed: true },
+  visitor:  { name: 'Visitor Centre', cost: 0, upkeep: 500, desc: 'Food, restrooms and souvenirs.', stars: 0, fixed: true },
   gate:     { name: 'Main Gate', cost: 0, upkeep: 0, desc: 'Guests arrive here.', stars: 0, fixed: true },
 };
 const FT = M.FENCE_TIERS;
@@ -347,7 +347,7 @@ function rebuildFences(){
 function penCanBuild(i0, j0, i1, j1){
   if (i1 - i0 < 2 || j1 - j0 < 2) return { ok: false, why: 'Enclosures must be at least 3 x 3 tiles' };
   if (i1 - i0 > 15 || j1 - j0 > 15) return { ok: false, why: 'Maximum size is 16 x 16 tiles' };
-  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){ if (!inGrid(i, j)) return { ok: false, why: 'Outside the park' }; const t = tileType[idx(i, j)]; if (t !== T_EMPTY) return { ok: false, why: t === T_BLOCK ? 'Ground too rough or wet' : 'Area overlaps something' }; }
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){ if (!inGrid(i, j)) return { ok: false, why: 'Outside the park' }; const t = tileType[idx(i, j)]; if (t !== T_EMPTY) return { ok: false, why: t === T_BLOCK ? 'Ground too rough or wet' : 'Overlaps a path, building or enclosure' }; }
   return { ok: true };
 }
 function penCost(i0, j0, i1, j1, tier){ return (2 * (i1 - i0 + 1) + 2 * (j1 - j0 + 1)) * FT[tier].cost + (i1 - i0 + 1) * (j1 - j0 + 1) * 60; }
@@ -436,6 +436,7 @@ function updateDino(d, dt){
   d.roarCD -= dt; d.killCD -= dt; d.turn = 0;
   if (d.prey && !d.prey.gone){ d.lookV = d.lookV || new THREE.Vector3(); d.model.setLook(d.lookV.set(d.prey.x, H(d.prey.x, d.prey.z) + 1.6, d.prey.z)); } else d.model.setLook(null);
   if (d.state === 'holding'){ return; }
+  if (pen && pen.held){ d.v = 0; d.model.animate(dt, 0, 0); return; } // picked up: AI and breakouts paused
   if (d.state === 'sedated' || d.state === 'airlift'){
     d.sleep = damp(d.sleep, 1, 2, dt); d.v = damp(d.v, 0, 4, dt); d.sedT += dt;
     if (d.state === 'sedated' && d.sedT > 5){ d.state = 'airlift'; d.sedT = 0; dust(d.x, d.z, SD.size * 0.4, 8, 0xb0a890); }
@@ -488,7 +489,7 @@ function ambientCall(d){ const now = performance.now(); if (now - lastAmbientCal
 function vocal(d){ const vol = camVol(d.x, d.z); const SD = SPECIES_DATA[d.sp]; if (d.sp === 'raptor' || d.sp === 'dilo') SFX.screech(vol); else SFX.roar(SD.size / 5, vol); }
 function camVol(x, z){ const d = Math.hypot(camera.position.x - x, camera.position.z - z, camera.position.y - H(x, z)); return clamp(1.3 - d / 160, 0, 1); }
 function dinoHourly(d){
-  const S = SPECIES[d.sp], pen = pens.get(d.pen); if (d.state === 'holding' || !pen) return;
+  const S = SPECIES[d.sp], pen = pens.get(d.pen); if (d.state === 'holding' || !pen || pen.held) return;
   d.hunger = clamp(d.hunger + (S.diet === 'meat' ? 0.075 : 0.09) * (d.state === 'loose' ? 1.5 : 1), 0, 1);
   const c = dinoComfort(d); const target = clamp(Math.max(0, d.hunger - 0.6) * 1.8 + (1 - c.space) * 0.6 + (1 - c.social) * 0.4 + (c.mixed ? 0.4 : 0) + (S.clever ? 0.15 : 0), 0, 1);
   d.stress = lerp(d.stress, target, 0.35);
@@ -565,12 +566,13 @@ function nextTile(g){
   let r = rnd() * tot; for (let k = 0; k < opts.length; k++){ r -= w[k]; if (r <= 0) return opts[k]; } return opts[opts.length - 1];
 }
 function shopsNear(i, j){ const out = new Set(); for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const ii = i + di, jj = j + dj; if (!inGrid(ii, jj)) continue; const k = idx(ii, jj); if (tileType[k] === T_BUILD){ const b = buildings.get(tileRef[k]); if (b) out.add(b.type); } } return out; }
+const FOOD_PRICE = 14, GIFT_PRICE = 24;
 function guestArrive(g){
   const k = idx(g.ci, g.cj); g.visited.add(k);
   if (g.state === 'walk'){ const s = shopsNear(g.ci, g.cj);
-    if ((s.has('food') || s.has('visitor')) && g.hunger > 0.4 && g.money > 12){ g.money -= 11; g.hunger = 0; g.happy += 4; earn('shops', 11); }
+    if ((s.has('food') || s.has('visitor')) && g.hunger > 0.4 && g.money > 15){ g.money -= FOOD_PRICE; g.hunger = 0; g.happy += 4; earn('shops', FOOD_PRICE); }
     if ((s.has('restroom') || s.has('visitor')) && g.bladder > 0.45){ g.bladder = 0; g.happy += 4; }
-    if ((s.has('gift') || s.has('visitor')) && g.happy > 62 && g.money > 30 && rnd() < (s.has('gift') ? 0.35 : 0.12)){ g.money -= 24; earn('shops', 24); }
+    if ((s.has('gift') || s.has('visitor')) && g.happy > 62 && g.money > 30 && rnd() < (s.has('gift') ? 0.35 : 0.12)){ g.money -= GIFT_PRICE; earn('shops', GIFT_PRICE); }
   }
 }
 function panicGuest(g, hit){ if (g.state === 'flee') return; g.state = 'flee'; g.happy -= hit; g.speed = fr(3.2, 4.2); g.panicT = 0; }
@@ -590,7 +592,7 @@ function updateGuests(dt, hourDt){
     if (g.gone) continue;
     if (g.state === 'enter' || g.state === 'walk' || g.state === 'leave' || g.state === 'flee'){
       g.stay -= hourDt; g.hunger += hourDt * 0.16; g.bladder += hourDt * 0.2; const v = viewMap[idx(clamp(g.ci, 0, GRID - 1), clamp(g.cj, 0, GRID - 1))];
-      g.happy += hourDt * ((v > 0 ? Math.min(14, v * 0.12) : -5) - (g.hunger > 0.75 ? 6 : 0) - (g.bladder > 0.85 ? 8 : 0)); g.happy = clamp(g.happy, 0, 100);
+      g.happy += hourDt * ((v > 0 ? Math.min(14, v * 0.12) : -2) - (g.hunger > 0.75 ? 6 : 0) - (g.bladder > 0.85 ? 8 : 0)); g.happy = clamp(g.happy, 0, 100);
       if (g.state === 'walk' && (g.stay <= 0 || g.happy < 18 || G.hour >= CLOSE)) g.state = 'leave';
       const dx = g.tx - g.x, dz = g.tz - g.z, dd = Math.hypot(dx, dz); const sp = g.speed * (g.state === 'flee' ? 1 : 1);
       if (dd < 0.3){
@@ -684,14 +686,15 @@ function hitDart(d){ if (d.state !== 'loose') return; d.darts++; const need = SP
   if (d.darts >= need){ d.state = 'sedated'; d.sedT = 0; d.v = 0; toast(`${d.name} is down. Airlifting back to the enclosure.`, 'good'); SFX.thud(0.9, 3); dust(d.x, d.z, 4, 8); showAlert(); } }
 
 /* ================= economy ================= */
-function earn(cat, amt){ G.money += amt; G.ledger[cat] = (G.ledger[cat] || 0) + amt; }
-function spend(cat, amt){ G.money -= amt; G.ledger[cat] = (G.ledger[cat] || 0) + amt; }
+function earn(cat, amt){ G.money += amt; G.ledger[cat] = (G.ledger[cat] || 0) + amt; flowAdd(cat === 'other' ? 'none' : cat, amt); }
+function spend(cat, amt){ G.money -= amt; G.ledger[cat] = (G.ledger[cat] || 0) + amt; flowAdd(cat, amt); }
 const INCOME = ['tickets', 'shops'];
 function ledgerProfit(L){ let p = 0; for (const k in L) p += INCOME.includes(k) ? L[k] : -L[k]; return p; }
 function appealTotal(){ const seen = {}; let a = 0; for (const d of dinos){ if (d.state === 'holding' || d.state === 'wild') continue; seen[d.sp] = (seen[d.sp] || 0) + 1; a += SPECIES[d.sp].appeal * Math.pow(0.75, seen[d.sp] - 1); } return a; }
-function dailyUpkeep(){ let u = 0; for (const b of buildings.values()) u += BUILD[b.type].upkeep || 0; for (const pen of pens.values()) u += pen.segs.length * FT[pen.tier].upkeep; u += dinos.filter(d => d.state !== 'wild').length * 450; return u; }
+const DINO_UPKEEP = 300;
+function dailyUpkeep(){ let u = 0; for (const b of buildings.values()) u += BUILD[b.type].upkeep || 0; for (const pen of pens.values()) u += pen.segs.length * FT[pen.tier].upkeep; u += dinos.filter(d => d.state !== 'wild').length * DINO_UPKEEP; return u; }
 function guestRatePerHour(){ const ap = appealTotal(); const priceF = clamp(1.6 - G.price / 60, 0.12, 1.5), repF = 0.4 + G.rep / 100, starF = 0.8 + G.stars * 0.12;
-  return (22 + ap * 1.7) * priceF * repF * starF * (1 + G.thrill * 0.55) / (CLOSE - OPEN); }
+  return (30 + ap * 2.2) * priceF * repF * starF * (1 + G.thrill * 0.55) / (CLOSE - OPEN); }
 function computeStars(){
   const ap = appealTotal(); const species = new Set(dinos.filter(d => d.state !== 'wild').map(d => d.sp)).size;
   const amen = [...buildings.values()].filter(b => ['food', 'gift', 'restroom', 'viewing'].includes(b.type)).length;
@@ -727,7 +730,7 @@ function hatchEgg(e){
   refreshSheet();
 }
 function hourTick(){
-  spend('upkeep', dailyUpkeep() / (DAY_END - DAY_START));
+  flowHour(); spend('upkeep', dailyUpkeep() / (DAY_END - DAY_START));
   const rangerSt = [...buildings.values()].filter(b => b.type === 'ranger');
   for (const pen of pens.values()){ const [cx, cz] = penCenter(pen); const near = rangerSt.some(b => Math.hypot(b.x - cx, b.z - cz) < 60);
     for (const s of pen.segs){ if (s.broken) continue; s.cond = clamp(s.cond - FT[pen.tier].decay + (near ? 0.03 : 0), 0, 1); } }
@@ -788,7 +791,7 @@ function buildDock(){
 function updateDockState(){ for (const b of $('dock').children){ const k = b.dataset.dock; b.classList.toggle('on', !!sel && (sel.kind === k || (k === 'pen' && sel.kind === 'build' && sel.ref === 'pens') || (k === 'build' && sel.kind === 'build' && sel.ref !== 'pens'))); } }
 let hudT = 0;
 function updateHUD(){
-  const mv = $('moneyV'); mv.textContent = fmt(G.money); mv.classList.toggle('neg', G.money < 0);
+  const mv = $('moneyV'); mv.textContent = fmt(G.money); mv.classList.toggle('neg', G.money < 0); updateIncomeChip();
   $('dayV').textContent = 'Day ' + G.day; const h = Math.floor(G.hour), mi = Math.floor((G.hour - h) * 60 / 15) * 15; $('timeV').textContent = String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
   $('speedBtn').innerHTML = ic(G.speed === 0 ? 'pause' : G.speed === 1 ? 'play' : G.speed === 2 ? 'fast' : 'faster') + `<span>${G.speed === 0 ? 'PAUSED' : G.speed + 'X'}</span>`;
   $('soundBtn').innerHTML = ic(SFX.isMuted() ? 'mute' : 'sound');
@@ -899,6 +902,7 @@ function renderSheet(){
       <div class="row"><span class="k"><b>Profit so far</b></span><span class="v" style="color:${pr < 0 ? '#ff8a6a' : 'var(--ok)'}">${fmt(pr)}</span></div>
       <div class="row"><span class="k">Incidents</span><span class="v">${G.stats.breakouts} breakouts, ${G.stats.deaths + G.stats.fed} guests lost</span></div>
       <div class="btns"><button class="btn" data-act="quality">Graphics: ${['Low', 'Medium', 'High'][QUALITY.level]}</button><button class="btn" data-act="save">${ic('save')}Save</button></div>
+      <div class="btns"><button class="btn pri" data-act="tips">How to make money</button><button class="btn" data-act="income">Income</button></div>
       <div class="btns"><button class="btn" data-act="tutorial">Tutorial</button><button class="btn" data-act="newgame">New park</button></div></div>`;
   }
   else if (k === 'goals'){
@@ -938,8 +942,11 @@ $('sheet').onclick = (e) => {
   if (act === 'quality'){ setQuality((QUALITY.level + 2) % 3, true); renderSheet(); return; }
   if (act === 'save'){ saveGame(); toast('Park saved.', 'good'); return; }
   if (act === 'tutorial'){ closeSheet(); showTutorial(0); return; }
+  if (act === 'tips'){ closeSheet(); showMoneyTips(); return; }
+  if (act === 'income'){ closeSheet(); showIncome(); return; }
   if (act === 'newgame'){ if (!t.dataset.confirm){ t.dataset.confirm = '1'; t.textContent = 'Tap again: erase this park'; return; } localStorage.removeItem(SAVE_KEY); location.reload(); return; }
 };
+$('money').onclick = () => { SFX.unlock(); SFX.click(); showIncome(); };
 $('speedBtn').onclick = () => { SFX.unlock(); SFX.click(); const i = SPEEDS.indexOf(G.speed); G.speed = SPEEDS[(i + 1) % SPEEDS.length]; updateHUD(); };
 $('soundBtn').onclick = () => { SFX.unlock(); SFX.setMuted(!SFX.isMuted()); localStorage.setItem('pp-muted', SFX.isMuted() ? '1' : '0'); updateHUD(); };
 
@@ -954,19 +961,72 @@ function showDaySummary(s){
   m.classList.remove('hidden'); m.querySelector('[data-act=ok]').onclick = () => { SFX.click(); m.classList.add('hidden'); };
 }
 
-/* ---------- tutorial ---------- */
+/* ---------- tutorial: short cards with progress dots; action steps stay out of the way and tick off when you do them ---------- */
+const tutFlags = { income: false };
 const TUT = [
-  ['Welcome, Director', 'This island is yours to build on. Drag with one finger to orbit the camera, pinch to zoom, and drag with two fingers to pan. On a computer, drag to orbit, right-drag to pan and scroll to zoom.'],
-  ['Build an enclosure', 'Tap Enclosure, choose a fence and tap two opposite corners beside the main path. Wooden fences are cheap but only hold Parasaurolophus. Bigger animals need stronger fences.'],
-  ['Hatch a dinosaur', 'Build a Hatchery from Build. Then tap your enclosure, choose Add dinosaur, and add a feeder that matches its diet. Hungry, crowded or lonely animals get stressed and test their fences.'],
-  ['Guests pay the bills', 'Guests arrive at the gate and walk the paths. Dinosaurs they can see near the paths keep them happy. Food stands, restrooms and gift shops earn extra. Watch the safety rating.'],
-  ['Your call', 'Carnivore enclosures have a Feed a guest button. It sells a lot of tickets. It also costs reputation and safety, and invites lawsuits. Breakouts happen when you cheap out on fences, so keep rangers nearby.'],
+  { t: 'Welcome, Director', b: 'This island is yours to build on. Drag with one finger to move around the map. Use two fingers to twist the view, pinch to zoom, and slide both fingers up or down to tilt. Press and hold a building or an enclosure to move it. On a computer, drag to move, right-drag to rotate and tilt, and scroll to zoom.', modal: true },
+  { t: 'How the park makes money', b: `Every guest pays a ticket at the gate ($35 to start). Guests come for dinosaurs they can see from the paths, so more animals bring more guests. Food stands and gift shops earn extra. Upkeep and feed are charged every hour, so earn more than you spend. You start with $300,000.`, modal: true },
+  { t: 'Build an enclosure', b: 'Tap Enclosure, keep Wooden, then tap two opposite corners right beside the main path. A 5 x 5 pen costs about $2,700. Guests must be able to see it from a path.', done: () => pens.size > 0 },
+  { t: 'Build a Hatchery', b: 'Tap Build and choose Hatchery ($60,000). Tap a spot near a path, then Place. Eggs incubate here.', done: () => hatcheries().length > 0 },
+  { t: 'Hatch a herbivore', b: 'Tap your enclosure and choose Add dinosaur. Parasaurolophus costs $14,000 and is happy behind wood. Get two: they like company and draw more guests.', done: () => eggs.length + dinos.length >= 1 },
+  { t: 'Add a feeder', b: 'In the enclosure panel tap Add feeder, then tap inside the pen to place a Plant Feeder ($5,000). Hungry animals get stressed and test the fence.', done: () => [...pens.values()].some(p => p.feeders.length > 0) },
+  { t: 'Place a food stand', b: 'Tap Build, choose Food Stand ($9,000) and place it touching the main path. Hungry guests pay $14 each.', done: () => [...buildings.values()].some(b => b.type === 'food') },
+  { t: 'Check your income', b: 'Under your funds is your net income per minute: money in minus money out. Tap it to see where the money goes.', done: () => tutFlags.income },
+  { t: 'Grow the park', b: 'Reinvest: more animals (mix species), paths past every exhibit, a restroom and a gift shop. Try a ticket price around $45 in Park. Stronger animals need stronger fences. Tips are always in Park > How to make money.', modal: true },
 ];
+let tutK = -1, tutDoneT = 0;
+function tutDots(k){ return `<div class="dots">${TUT.map((_, i) => `<i class="${i < k ? 'd' : i === k ? 'on' : ''}"></i>`).join('')}</div>`; }
+function endTutorial(){ tutK = -1; $('tut').classList.add('hidden'); $('coach').classList.add('hidden'); placeToasts(); G.tutorialDone = true; saveGame(); }
 function showTutorial(k){
-  const el = $('tut'); if (k >= TUT.length){ el.classList.add('hidden'); G.tutorialDone = true; saveGame(); return; }
-  el.innerHTML = `<div class="box glass"><div class="step">${k + 1} OF ${TUT.length}</div><h3>${TUT[k][0]}</h3><p>${TUT[k][1]}</p><div class="btns"><button class="btn" data-act="skip">Skip</button><button class="btn pri" data-act="next">${k === TUT.length - 1 ? 'Start building' : 'Next'}</button></div></div>`;
-  el.classList.remove('hidden'); el.querySelector('[data-act=skip]').onclick = () => { SFX.click(); showTutorial(99); }; el.querySelector('[data-act=next]').onclick = () => { SFX.unlock(); SFX.click(); showTutorial(k + 1); };
-}
+  const el = $('tut'), co = $('coach'); if (k >= TUT.length){ endTutorial(); return; } tutK = k; tutDoneT = 0; const s = TUT[k];
+  if (k === 0) tutFlags.income = false;
+  if (s.modal){ co.classList.add('hidden');
+    el.innerHTML = `<div class="box glass">${tutDots(k)}<h3>${s.t}</h3><p>${s.b}</p><div class="btns"><button class="btn" data-act="skip">Skip tutorial</button><button class="btn pri" data-act="next">${k === TUT.length - 1 ? 'Start building' : 'Next'}</button></div></div>`;
+    el.classList.remove('hidden'); el.querySelector('[data-act=skip]').onclick = () => { SFX.click(); endTutorial(); }; el.querySelector('[data-act=next]').onclick = () => { SFX.unlock(); SFX.click(); showTutorial(k + 1); }; }
+  else { el.classList.add('hidden');
+    co.innerHTML = `${tutDots(k)}<div class="ct"><b>${s.t}</b><span>${s.b}</span></div><div class="cb"><button class="btn" data-act="skip">Skip tutorial</button><button class="btn" data-act="next">Later</button></div>`;
+    co.classList.remove('hidden'); co.querySelector('[data-act=skip]').onclick = () => { SFX.click(); endTutorial(); }; co.querySelector('[data-act=next]').onclick = () => { SFX.click(); showTutorial(k + 1); }; }
+  placeToasts(); }
+function tutTick(dt){ if (tutK < 0) return; const s = TUT[tutK]; if (!s || s.modal || !s.done) return;
+  if (tutDoneT > 0){ tutDoneT -= dt; if (tutDoneT <= 0) showTutorial(tutK + 1); return; }
+  if (s.done()){ tutDoneT = 1.1; const co = $('coach'); co.classList.add('ok'); const b = co.querySelector('.ct b'); if (b) b.innerHTML = `${ic('check')} ${s.t}`; SFX.cash && SFX.cash(); setTimeout(() => co.classList.remove('ok'), 1100); } }
+function placeToasts(){ const co = $('coach'), t = $('toasts'); if (!co || !t) return; if (co.classList.contains('hidden')){ t.style.top = ''; return; } const r = co.getBoundingClientRect(); t.style.top = (r.bottom + 8) + 'px'; }
+
+/* ---------- income readout: net money per minute (at 1x, one minute = 6 game hours), rolling over the last game day ---------- */
+const FLOW_CATS = ['tickets', 'shops', 'upkeep', 'feed', 'fines', 'other'];
+function flowState(){ if (!G.flow || !G.flow.acc) G.flow = { acc: {}, hist: [] }; return G.flow; }
+function flowAdd(cat, amt){ if (!FLOW_CATS.includes(cat) || !amt) return; const f = flowState(); f.acc[cat] = (f.acc[cat] || 0) + amt; }
+function flowHour(){ const f = flowState(); f.hist.push(f.acc); f.acc = {}; while (f.hist.length > DAY_END - DAY_START) f.hist.shift(); }
+function flowPerMin(){ const f = flowState(); const n = f.hist.length; if (!n) return null; const sum = {}; for (const h of f.hist) for (const k in h) sum[k] = (sum[k] || 0) + h[k];
+  const k = 60 / (n * SEC_PER_HOUR); const r = {}; for (const c of FLOW_CATS) r[c] = (sum[c] || 0) * k; r.in = r.tickets + r.shops; r.out = r.upkeep + r.feed + r.fines + r.other; r.net = r.in - r.out; r.hours = n; return r; }
+const fmtRate = v => (v >= 0 ? '+' : '-') + fmt(Math.abs(Math.round(v / 10) * 10)).replace('-', '') + '/min';
+function updateIncomeChip(){ const el = $('incomeV'); if (!el) return; const r = flowPerMin(); if (!r){ el.textContent = 'Income: tap for tips'; el.className = 'inc'; return; }
+  el.textContent = fmtRate(r.net); el.className = 'inc ' + (r.net >= 0 ? 'pos' : 'neg'); }
+function expectedGuestsPerDay(){ return guestRatePerHour() * (CLOSE - OPEN); }
+function showIncome(){ tutFlags.income = true; const r = flowPerMin(); const m = $('modal');
+  const row = (k, v, sign) => `<div class="row"><span class="k">${k}</span><span class="v" style="color:${sign > 0 ? 'var(--ok)' : '#ffb39a'}">${sign > 0 ? '+' : '-'}${fmt(Math.round(Math.abs(v)))}</span></div>`;
+  const body = r ? `<div class="sub">Average per minute over the last ${r.hours} game hour${r.hours > 1 ? 's' : ''}, at normal speed. Building and hatching are investments and are not counted.</div>
+    <div class="lbl">Money in</div>${row('Tickets', r.tickets, 1)}${row('Shops and food', r.shops, 1)}
+    <div class="lbl" style="margin-top:10px">Money out</div>${row('Upkeep and staff', r.upkeep, -1)}${row('Dinosaur feed', r.feed, -1)}${r.fines + r.other > 0 ? row('Fines and emergencies', r.fines + r.other, -1) : ''}
+    <div class="row" style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px"><span class="k"><b>Net per minute</b></span><span class="v" style="font-family:var(--serif);font-size:20px;color:${r.net < 0 ? '#ff8a6a' : 'var(--ok)'}">${fmtRate(r.net)}</span></div>`
+    : `<div class="sub">Your income shows up after the first game hour.</div>`;
+  m.innerHTML = `<div class="box glass"><div class="lbl">Park finances</div><h2>Income</h2>${body}
+    <div class="row"><span class="k">Expected guests per day</span><span class="v">${Math.round(expectedGuestsPerDay())}</span></div><div class="row"><span class="k">Daily upkeep</span><span class="v">-${fmt(Math.round(dailyUpkeep()))}</span></div>
+    <div class="btns"><button class="btn" data-act="tips">How to make money</button><button class="btn pri" data-act="ok">Close</button></div></div>`;
+  m.classList.remove('hidden'); m.onclick = (e) => { const b = e.target.closest('[data-act]'); if (!b) return; SFX.click(); if (b.dataset.act === 'tips') showMoneyTips(); else m.classList.add('hidden'); }; }
+function showMoneyTips(){ const m = $('modal'); const best = 48; const sp = SPECIES; const gf = expectedGuestsPerDay() / (30 + appealTotal() * 2.2);
+  const li = (h, t) => `<div class="tip"><b>${h}</b><span>${t}</span></div>`;
+  m.innerHTML = `<div class="box glass tips"><div class="lbl">Director's guide</div><h2>How to make money</h2>
+    ${li('Tickets are most of your income', `Every guest pays the ticket price (now ${fmt(G.price)}) at the gate. With your current rating and reputation, a park with no dinosaurs gets about ${Math.round(30 * gf)} guests a day, and each point of dinosaur appeal adds about ${(2.2 * gf).toFixed(1)} more. Right now you can expect about ${Math.round(expectedGuestsPerDay())} guests a day.`)}
+    ${li('Dinosaurs bring the crowds', `Appeal: Parasaurolophus ${sp.para.appeal}, Triceratops ${sp.trike.appeal}, Stegosaurus ${sp.stego.appeal}, Velociraptor ${sp.raptor.appeal}, T. rex ${sp.trex.appeal}. A second animal of the same species counts 75%, so mixing species pays more. Herd animals stay calm with company.`)}
+    ${li('Let guests see them', 'Guests get happier while they can see dinosaurs from a path, and bored when they cannot. Happy guests raise your reputation, and reputation brings more guests. Put enclosures right beside paths and add Viewing Platforms.')}
+    ${li('Shops add extra', `Hungry guests pay ${fmt(FOOD_PRICE)} at a Food Stand and happy guests spend ${fmt(GIFT_PRICE)} in a Gift Shop. Shops only sell to guests on a path they touch.`)}
+    ${li('Ticket price', `Each $6 on the price drives away about 10% of new guests. Around ${fmt(best - 3)} to ${fmt(best + 2)} earns the most per day. Higher only pays once the park is famous.`)}
+    ${li('What it costs each day', `Visitor Centre ${fmt(BUILD.visitor.upkeep)}, Hatchery ${fmt(BUILD.hatchery.upkeep)}, Food Stand ${fmt(BUILD.food.upkeep)}, Restrooms ${fmt(BUILD.restroom.upkeep)}, each dinosaur ${fmt(DINO_UPKEEP)} plus its meals (Parasaurolophus ${fmt(sp.para.feed / 2)} a meal). Fences cost a little per segment. Only build what earns its keep.`)}
+    ${li('Stars and goals', 'Each star brings about 12% more guests and unlocks new species. Completing goals pays investor bonuses, from $20,000 for your first dinosaur.')}
+    ${li('Avoid disasters', 'A breakout costs safety and can kill guests. That means lawsuits of $30,000 to $90,000. Use strong enough fences, keep feeders stocked and build a Ranger Station near big animals.')}
+    <div class="btns"><button class="btn pri" data-act="ok">Got it</button></div></div>`;
+  m.classList.remove('hidden'); m.scrollTop = 0; m.onclick = (e) => { const b = e.target.closest('[data-act]'); if (!b) return; SFX.click(); m.classList.add('hidden'); }; }
 
 /* ---------- title ---------- */
 function showTitle(){
@@ -1026,7 +1086,7 @@ function startTool(t){ tool = t; closeSheet(); TU.uGrid.value = 1; $('dock').cla
   if (t.kind === 'path'){ t.nodes = []; t.segs = []; }
   if (t.kind === 'bld'){ ghost = new THREE.Mesh(bldGeo(t.type), ghostMat); ghost.visible = false; scene.add(ghost); t.rot = null; t.hover = null; }
   renderToolbar(); $('toolbar').classList.remove('hidden'); placeUndoBar(); }
-function cancelTool(){ if (!tool) return; if (tool.move){ const m = tool.move; tool.move = null; const opts = { id: m.id }; if (!BUILD[m.type].inPen) opts.rot = m.rot; placeBuilding(m.type, m.i, m.j, opts); afterStructureChange(); } tool = null; TU.uGrid.value = 0; hideOverlay(); $('toolbar').classList.add('hidden'); if (G.running) $('dock').classList.remove('hidden'); placeUndoBar(); }
+function cancelTool(){ if (!tool) return; if (tool.kind === 'penmove' && tool.p) cancelPenMove(); if (tool.move){ const m = tool.move; tool.move = null; const opts = { id: m.id }; if (!BUILD[m.type].inPen) opts.rot = m.rot; placeBuilding(m.type, m.i, m.j, opts); afterStructureChange(); } tool = null; TU.uGrid.value = 0; hideOverlay(); $('toolbar').classList.add('hidden'); if (G.running) $('dock').classList.remove('hidden'); placeUndoBar(); }
 function renderToolbar(){
   if (!tool) return; const tb = $('toolbar'); let title = '', hint = '', cost = '', costBad = false, btns = '';
   if (tool.kind === 'path'){ title = 'Footpath'; const n = tool.nodes.length, tiles = pendingTiles().length, c = tiles * BUILD.path.cost;
@@ -1038,6 +1098,9 @@ function renderToolbar(){
     costBad = !funds || (hv && !ok);
     hint = !hv ? (B.inPen ? 'Tap a tile inside an enclosure to preview.' : 'Tap open ground next to a path to preview.') + ' Drag to look around.' : !ok ? hv[2].why : !funds ? 'Not enough funds.' : mv ? 'Drag it or tap a new spot, then Place. Cancel puts it back.' : 'Green means it fits. Drag the preview or tap elsewhere to move it.';
     btns = `<button class="btn" data-t="rotate" ${hv && !B.inPen ? '' : 'disabled'}>${ic('rotate')}Rotate</button><button class="btn" data-t="exit">${hv || mv ? 'Cancel' : 'Close'}</button><button class="btn pri" data-t="place" ${ok && funds ? '' : 'disabled'}>Place</button>`; }
+  if (tool.kind === 'penmove'){ title = 'Move ' + tool.p.name; cost = 'Free'; costBad = !tool.ok;
+    hint = tool.ok ? 'Drag it or tap a new spot, then Place. Dinosaurs, feeders and fences move with it. Cancel puts it back.' : tool.why;
+    btns = `<button class="btn" data-t="rotate">${ic('rotate')}Rotate</button><button class="btn" data-t="exit">Cancel</button><button class="btn pri" data-t="place" ${tool.ok ? '' : 'disabled'}>Place</button>`; }
   if (tool.kind === 'pen'){ title = 'Enclosure'; const r = tool.rect;
     if (r){ const i0 = Math.min(r[0], r[2]), i1 = Math.max(r[0], r[2]), j0 = Math.min(r[1], r[3]), j1 = Math.max(r[1], r[3]); const chk = penCanBuild(i0, j0, i1, j1); const c = penCost(i0, j0, i1, j1, tool.tier);
       hint = tool.pending ? (chk.ok ? `${i1 - i0 + 1} x ${j1 - j0 + 1} tiles (${(i1 - i0 + 1) * TILE} m x ${(j1 - j0 + 1) * TILE} m). Tap to move this corner.` : chk.why) : 'Now tap the opposite corner.'; cost = tool.pending ? fmt(c) : ''; costBad = !chk.ok || G.money < c;
@@ -1056,6 +1119,7 @@ $('toolbar').onclick = (e) => { const b = e.target.closest('button'); if (!b || 
   if (a === 'cancel'){ tool.rect = null; tool.pending = false; tool.a = null; hideOverlay(); renderToolbar(); return; }
   if (a === 'undo' && tool.kind === 'path'){ if (tool.segs.length) tool.segs.pop(); tool.nodes.pop(); drawPending(); renderToolbar(); return; }
   if (a === 'pathdone'){ commitPaths(); return; }
+  if (tool.kind === 'penmove'){ if (a === 'rotate') penRotate(); if (a === 'place') commitPenMove(); if (a === 'exit') cancelTool(); return; }
   if (a === 'rotate' && tool.hover){ const [i, j] = tool.hover, [w, h] = footprint(tool.type, 0); const cur = tool.rot ?? faceRot(i, j, w, h); tool.rot = Math.round((cur + Math.PI / 2) / (Math.PI / 2)) % 4 * (Math.PI / 2); setPreview([i + Math.floor((w - 1) / 2), j + Math.floor((h - 1) / 2)]); return; }
   if (a === 'place'){ commitBuilding(); return; }
   if (a === 'confirm'){ const r = tool.rect; const i0 = Math.min(r[0], r[2]), i1 = Math.max(r[0], r[2]), j0 = Math.min(r[1], r[3]), j1 = Math.max(r[1], r[3]); const c = penCost(i0, j0, i1, j1, tool.tier);
@@ -1073,6 +1137,7 @@ function paintLine(a, b, erase){ let [x0, y0] = a; const [x1, y1] = b; const dx 
 /* a deliberate tap (no camera drag) is the only thing that edits a preview */
 function toolTap(p){ const t = tileAtScreen(p.x, p.y); if (!t){ return; }
   if (tool.kind === 'bld'){ setPreview(t); keepPreviewVisible(); return; }
+  if (tool.kind === 'penmove'){ penPreviewCentred(t); keepPenVisible(); return; }
   if (tool.kind === 'bulldoze'){ bulldozeTap(p); return; }
   if (tool.kind === 'path'){ const N = tool.nodes; const why = pathTileOk(t[0], t[1]); if (why){ toast(why, 'bad'); return; }
     if (!N.length){ N.push(t); drawPending(); renderToolbar(); return; }
@@ -1118,6 +1183,53 @@ function bulldozeTap(p){ const t = tileAtScreen(p.x, p.y); if (!t) return; const
   if (tileType[k] === T_BUILD){ const b = buildings.get(tileRef[k]); if (b && !BUILD[b.type].fixed){ G.money += BUILD[b.type].cost * 0.5; removeBuilding(b); afterStructureChange(); SFX.build(); } else toast('That cannot be removed.', ''); }
   else if (tileType[k] === T_PEN){ const pen = pens.get(tileRef[k]); const f = pen.feeders.find(f => f.i === t[0] && f.j === t[1]); if (f){ const b = buildings.get(f.id); G.money += BUILD[b.type].cost * 0.5; removeBuilding(b); afterStructureChange(); } else toast('Open the enclosure to demolish it.', ''); }
 }
+/* ---- press and hold on an enclosure (fence or floor) picks up the whole pen: fences, feeders and dinosaurs move together ---- */
+function penAtScreen(x, y){ const p = groundAtScreen(x, y); if (!p) return null; const m = 1.4;
+  for (const pen of pens.values()) if (p.x >= eX(pen.i0) - m && p.x <= eX(pen.i1 + 1) + m && p.z >= eX(pen.j0) - m && p.z <= eX(pen.j1 + 1) + m) return pen; return null; }
+function penMoveBlock(pen){
+  const bad = dinos.find(d => d.pen === pen.id && d.state !== 'pen' && d.state !== 'holding');
+  if (bad) return bad.state === 'loose' ? `${bad.name} is loose. Recapture it before moving ${pen.name}.` : `${bad.name} is being recaptured. Wait until it is back before moving ${pen.name}.`;
+  if (guests.some(g => !g.gone && g.pen === pen.id && ['lured', 'inpen', 'tossed'].includes(g.state))) return `A guest is inside ${pen.name}. Wait for feeding to finish.`;
+  return ''; }
+function penSnapshot(pen){ return { i0: pen.i0, j0: pen.j0, i1: pen.i1, j1: pen.j1, geom: pen.geom, segs: pen.segs,
+  feeders: pen.feeders.map(f => ({ id: f.id, i: f.i, j: f.j })), dinos: dinos.filter(d => d.pen === pen.id).map(d => ({ d, x: d.x, z: d.z, hd: d.hd })) }; }
+// local coords (u, v) in tiles from the pen's top-left edge; r quarter turns: (u, v) -> (h - v, u)
+function penXf(o, r){ const W = o.i1 - o.i0 + 1, Hh = o.j1 - o.j0 + 1;
+  return { W: r % 2 ? Hh : W, H: r % 2 ? W : Hh, f(u, v){ let h = Hh, w = W; for (let k = 0; k < r; k++){ const nu = h - v, nv = u; u = nu; v = nv; const t = w; w = h; h = t; } return [u, v]; } }; }
+function applyPenPose(pen, o, ni0, nj0, r, visual = true){
+  const X = penXf(o, r); pen.i0 = ni0; pen.j0 = nj0; pen.i1 = ni0 + X.W - 1; pen.j1 = nj0 + X.H - 1;
+  const toW = (u, v) => { const [a, b] = X.f(u, v); return [eX(ni0) + a * TILE, eX(nj0) + b * TILE]; };
+  const lu = x => (x - eX(o.i0)) / TILE, lv = z => (z - eX(o.j0)) / TILE;
+  // fence segments keep their tier, condition and damage: match each new segment to the old one that lands on it
+  const moved = o.geom.map(g => toW(lu((g[0] + g[2]) / 2), lv((g[1] + g[3]) / 2)));
+  pen.geom = penSegments(pen); pen.segs = pen.geom.map(g => { const mx = (g[0] + g[2]) / 2, mz = (g[1] + g[3]) / 2; let best = 0, bd = 1e9; moved.forEach(([x, z], k) => { const dd = Math.hypot(x - mx, z - mz); if (dd < bd){ bd = dd; best = k; } }); return o.segs[best]; });
+  pen.feeders = o.feeders.map(f => { const [x, z] = toW(f.i - o.i0 + 0.5, f.j - o.j0 + 0.5); const ni = toI(x), nj = toI(z); const b = buildings.get(f.id);
+    if (b){ b.i = ni; b.j = nj; b.x = tX(ni); b.z = tZ(nj); if (visual) b.mesh.position.set(b.x, H(b.x, b.z) - 0.05 + (tool && tool.kind === 'penmove' ? 0.8 : 0), b.z); } return { id: f.id, type: b ? b.type : 'plant', i: ni, j: nj }; });
+  for (const s of o.dinos){ const d = s.d; const [x, z] = toW(lu(s.x), lv(s.z)); d.x = x; d.z = z; d.tx = x; d.tz = z; d.hd = s.hd - r * Math.PI / 2; d.v = 0; d.prey = null; if (visual){ placeDinoModel(d); if (tool && tool.kind === 'penmove') d.model.root.position.y += 0.8; } }
+  if (visual){ drawMask(); rebuildFences(); } }
+function pickUpPen(pen, q){ const why = penMoveBlock(pen); if (why){ toast(why, 'bad'); return false; }
+  closeSheet(); clearUndo(); const o = penSnapshot(pen);
+  for (let j = pen.j0; j <= pen.j1; j++) for (let i = pen.i0; i <= pen.i1; i++){ const k = idx(i, j); tileType[k] = T_EMPTY; tileRef[k] = -1; }
+  pen.held = true; startTool({ kind: 'penmove', p: pen, o, r: 0, at: [pen.i0, pen.j0], ok: true, why: '' });
+  const t = q && tileAtScreen(q.x, q.y); tool.grab = t ? [t[0] - pen.i0, t[1] - pen.j0] : [0, 0];
+  penPreview(pen.i0, pen.j0); try { navigator.vibrate && navigator.vibrate(18); } catch (e) {} SFX.click(); return true; }
+function penPreview(i0, j0){ const T = tool, pen = T.p; const X = penXf(T.o, T.r); i0 = clamp(i0, 0, GRID - X.W); j0 = clamp(j0, 0, GRID - X.H); T.at = [i0, j0];
+  applyPenPose(pen, T.o, i0, j0, T.r); const chk = penCanBuild(i0, j0, i0 + X.W - 1, j0 + X.H - 1); T.ok = chk.ok; T.why = chk.ok ? '' : chk.why;
+  setOverlay(i0, j0, i0 + X.W - 1, j0 + X.H - 1, chk.ok); renderToolbar(); }
+function penPreviewCentred(t){ const X = penXf(tool.o, tool.r); penPreview(t[0] - Math.floor((X.W - 1) / 2), t[1] - Math.floor((X.H - 1) / 2)); }
+function penRotate(){ const T = tool, X0 = penXf(T.o, T.r); const ci = T.at[0] + (X0.W - 1) / 2, cj = T.at[1] + (X0.H - 1) / 2; T.r = (T.r + 1) % 4; const X = penXf(T.o, T.r);
+  penPreview(Math.round(ci - (X.W - 1) / 2), Math.round(cj - (X.H - 1) / 2)); }
+function finishPenMove(){ const pen = tool.p, o = tool.o; pen.held = false;
+  for (let j = pen.j0; j <= pen.j1; j++) for (let i = pen.i0; i <= pen.i1; i++){ const k = idx(i, j); tileType[k] = T_PEN; tileRef[k] = pen.id; }
+  const known = new Set(o.dinos.map(s => s.d)); for (const d of dinos) if (d.pen === pen.id && !known.has(d)){ const [x, z] = randomPenPoint(pen, 3); d.x = x; d.z = z; d.tx = x; d.tz = z; }
+  for (const d of dinos) if (d.pen === pen.id) placeDinoModel(d);
+  for (const f of pen.feeders){ const b = buildings.get(f.id); if (b) b.mesh.position.y = H(b.x, b.z) - 0.05; }
+  afterStructureChange(); }
+function commitPenMove(){ const T = tool; if (!T.ok){ toast(T.why || 'That spot does not fit.', 'bad'); return; }
+  const pen = T.p; finishPenMove(); tool.p = null; SFX.build(); const [cx, cz] = penCenter(pen); dust(cx, cz, 6, 8); cancelTool(); toast(`${pen.name} moved.`, 'good'); }
+function cancelPenMove(){ const T = tool; if (!T.p) return; applyPenPose(T.p, T.o, T.o.i0, T.o.j0, 0); finishPenMove(); T.p = null; }
+function keepPenVisible(){ if (!tool || tool.kind !== 'penmove') return; const [cx, cz] = penCenter(tool.p); const tb = $('toolbar').getBoundingClientRect(); _pvp.set(cx, H(cx, cz) + 4, cz).project(camera);
+  const sy = (-_pvp.y * 0.5 + 0.5) * innerHeight; if (sy > tb.top - 40 || sy < 150){ cam.goal.tx = cx; cam.goal.tz = cz; cam.follow = null; } }
 /* ---- safety net: undo the last committed placement for 10 s, full refund ---- */
 let undoRec = null, undoTimer = 0;
 function recordUndo(r){ undoRec = Object.assign(r, { until: performance.now() + 10000 }); clearTimeout(undoTimer); undoTimer = setTimeout(clearUndo, 10000); renderUndoBar(); }
@@ -1140,7 +1252,7 @@ const title = { on: true };
 function focusOn(x, z, dist){ cam.goal.tx = x; cam.goal.tz = z; if (dist) cam.goal.dist = clamp(dist, 12, 330); }
 function updateCamera(dt){
   const g = cam.goal; if (cam.follow){ if (!dinos.includes(cam.follow) || !cam.follow.model.root.visible) cam.follow = null; else { g.tx = cam.follow.x; g.tz = cam.follow.z; } }
-  if (title.on){ g.yaw += dt * 0.04; }
+  if (title.on){ g.yaw += dt * 0.04; } else updateFling(dt);
   g.pitch = clamp(g.pitch, 0.1, 1.45); g.dist = clamp(g.dist, 12, 330); g.tx = clamp(g.tx, -HALF - 40, HALF + 40); g.tz = clamp(g.tz, -HALF - 60, HALF + 40);
   const k = 10; cam.tx = damp(cam.tx, g.tx, k, dt); cam.tz = damp(cam.tz, g.tz, k, dt); cam.dist = damp(cam.dist, g.dist, k, dt); cam.pitch = damp(cam.pitch, g.pitch, k, dt);
   let dy = g.yaw - cam.yaw; if (dy > Math.PI || dy < -Math.PI){ dy = ((dy + Math.PI) % TAU + TAU) % TAU - Math.PI; g.yaw = cam.yaw + dy; }
@@ -1178,21 +1290,32 @@ function pinchInfo(){ const a = [...ptrs.values()]; const cx = (a[0].x + a[1].x)
 canvas.addEventListener('pointerdown', (e) => {
   SFX.unlock(); try { canvas.setPointerCapture(e.pointerId); } catch (err) {} ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), btn: e.button });
   if (title.on) return;
-  if (ptrs.size === 1){ gesture = { kind: e.button === 2 || e.button === 1 ? 'pan' : 'one', moved: false, ghost: false };
-    if (!tool && gesture.kind === 'one'){ const gs = gesture, pid = e.pointerId; gs.hold = setTimeout(() => { const q = ptrs.get(pid); if (gesture !== gs || gs.moved || ptrs.size !== 1 || !q || tool) return; const b = buildingAtScreen(q.x, q.y); if (!b) return; gs.held = true; pickUp(b, q); gs.ghost = true; }, 500); }
+  const flung = stopFling(); if (ptrs.size === 1){ gesture = { kind: e.button === 2 || e.button === 1 ? 'orbit' : 'one', moved: false, ghost: false, flung };
+    if (!tool && gesture.kind === 'one' && !gesture.flung){ const gs = gesture, pid = e.pointerId; gs.hold = setTimeout(() => { const q = ptrs.get(pid); if (gesture !== gs || gs.moved || ptrs.size !== 1 || !q || tool) return;
+      const b = buildingAtScreen(q.x, q.y); if (b){ gs.held = true; pickUp(b, q); gs.ghost = true; return; }
+      const pen = penAtScreen(q.x, q.y); if (pen){ gs.held = true; if (pickUpPen(pen, q)) gs.ghost = true; } }, 500); }
+    if (tool && tool.kind === 'penmove' && gesture.kind === 'one'){ const t = tileAtScreen(e.clientX, e.clientY); const p = tool.p; if (t && t[0] >= p.i0 - 1 && t[0] <= p.i1 + 1 && t[1] >= p.j0 - 1 && t[1] <= p.j1 + 1){ gesture.ghost = true; tool.grab = [t[0] - p.i0, t[1] - p.j0]; } }
+    if (gesture.kind === 'one' && !gesture.ghost) startPan(e.clientX, e.clientY);
     // a drag that starts on the building preview moves the preview; any other drag only moves the camera
     if (tool && tool.kind === 'bld' && tool.hover && gesture.kind === 'one'){ const t = tileAtScreen(e.clientX, e.clientY); const [i, j] = tool.hover, [w, h] = footprint(tool.type, 0); if (t && t[0] >= i - 1 && t[0] <= i + w && t[1] >= j - 1 && t[1] <= j + h) gesture.ghost = true; } }
-  else if (ptrs.size === 2){ if (gesture && gesture.hold) clearTimeout(gesture.hold); gesture = { kind: 'two', moved: true, last: pinchInfo() }; }
+  else if (ptrs.size === 2){ if (gesture && gesture.hold) clearTimeout(gesture.hold); const n = pinchInfo(); gesture = { kind: 'two', moved: true, last: n, start: n, mode: null }; }
 });
 canvas.addEventListener('pointermove', (e) => {
   const p = ptrs.get(e.pointerId); if (!p) return;
   const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY; if (!gesture || title.on) return;
   if (Math.hypot(p.x - p.sx, p.y - p.sy) > 7){ gesture.moved = true; if (gesture.hold && !gesture.held){ clearTimeout(gesture.hold); gesture.hold = 0; } }
   if (gesture.kind === 'one'){ if (!gesture.moved) return;
-    if (gesture.ghost){ const t = tileAtScreen(p.x, p.y); if (t){ setPreview(t); if (gesture.held && ghost){ ghost.position.y += 0.8; } } return; }
-    cam.goal.yaw -= dx * 0.0065; cam.goal.pitch = clamp(cam.goal.pitch + dy * 0.005, 0.1, 1.45); cam.follow = null; }
-  else if (gesture.kind === 'pan'){ panBy(dx, dy); }
-  else if (gesture.kind === 'two' && ptrs.size >= 2){ const n = pinchInfo(); grabMap(gesture.last, n); gesture.last = n; }
+    if (gesture.ghost){ const t = tileAtScreen(p.x, p.y); if (t){ if (tool && tool.kind === 'penmove'){ const at = [t[0] - tool.grab[0], t[1] - tool.grab[1]]; if (at[0] !== tool.at[0] || at[1] !== tool.at[1]) penPreview(at[0], at[1]); } else { setPreview(t); if (gesture.held && ghost){ ghost.position.y += 0.8; } } } return; }
+    dragPan(p.x, p.y); }
+  else if (gesture.kind === 'orbit'){ cam.goal.yaw -= dx * 0.0065; cam.goal.pitch = clamp(cam.goal.pitch + dy * 0.005, 0.1, 1.45); cam.follow = null; }
+  else if (gesture.kind === 'two' && ptrs.size >= 2){ const n = pinchInfo(), g0 = gesture.start;
+    // decide once per gesture: both fingers sliding up/down together = tilt; anything else = grab the map (pan, twist, pinch)
+    if (!gesture.mode){ const ddx = n.cx - g0.cx, ddy = n.cy - g0.cy, dd = n.d - g0.d; let da = n.ang - g0.ang; if (da > Math.PI) da -= TAU; if (da < -Math.PI) da += TAU;
+      const tot = Math.hypot(ddx, ddy) + Math.abs(dd) + Math.abs(da) * 80; if (tot < 12) return;
+      gesture.mode = Math.abs(ddy) > 2 * Math.abs(ddx) && Math.abs(dd) < 0.45 * Math.abs(ddy) && Math.abs(da) < 0.12 && g0.d > 60 ? 'tilt' : 'grab'; gesture.last = g0; }
+    if (gesture.mode === 'tilt'){ cam.goal.pitch = clamp(cam.goal.pitch + (n.cy - gesture.last.cy) * 0.005, 0.1, 1.45); }
+    else grabMap(gesture.last, n);
+    gesture.last = n; }
 });
 /* Two fingers grab the map: the ground point under the pinch centre stays under the fingers while they move,
    spread (zoom in) or twist (map turns the same way as the fingers). Rays use the target camera, not the smoothed one. */
@@ -1205,14 +1328,34 @@ function grabMap(l, n){ const g = cam.goal; cam.follow = null; syncGoalCamera();
   let da = n.ang - l.ang; if (da > Math.PI) da -= TAU; if (da < -Math.PI) da += TAU; g.yaw += da;
   syncGoalCamera(); const B = groundAtScreen(n.cx, n.cy, goalCamera);
   if (A && B){ g.tx += A.x - B.x; g.tz += A.z - B.z; } else panBy(n.cx - l.cx, n.cy - l.cy); }
+/* One finger grabs the map: the ground point under the finger stays under it (ray vs. a flat plane at that point's height,
+   so hills do not make it jump). Releasing while moving lets it glide a little; the glide stops at the island edge. */
+const panS = { a: null, hist: [] }; const fling = { vx: 0, vz: 0 }; const _ray = new THREE.Raycaster(), _pl = new THREE.Plane(), _hit = new THREE.Vector3();
+function planeAtScreen(x, y, cm, h){ _ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1); _ray.setFromCamera(_ndc, cm); _pl.set(new THREE.Vector3(0, 1, 0), -h);
+  const r = _ray.ray; if (r.direction.y > -0.02) return null; const p = r.intersectPlane(_pl, _hit); if (!p || p.distanceTo(r.origin) > 900) return null; return p.clone(); }
+function startPan(x, y){ syncGoalCamera(); const g = groundAtScreen(x, y, goalCamera); panS.a = g ? g.clone() : null; panS.hist = []; }
+function dragPan(x, y){ if (!panS.a) return startPan(x, y); const g = cam.goal; cam.follow = null;
+  for (let it = 0; it < 2; it++){ syncGoalCamera(); const b = planeAtScreen(x, y, goalCamera, panS.a.y); if (!b) break; g.tx += panS.a.x - b.x; g.tz += panS.a.z - b.z; }
+  clampGoal(); const now = performance.now(); panS.hist.push([now, g.tx, g.tz]); while (panS.hist.length > 2 && now - panS.hist[0][0] > 90) panS.hist.shift(); }
+function releasePan(){ const h = panS.hist; panS.a = null; if (h.length < 2) return; const [t0, x0, z0] = h[0], [t1, x1, z1] = h[h.length - 1]; const dt = (t1 - t0) / 1000;
+  if (dt < 0.016 || performance.now() - t1 > 60) return; let vx = (x1 - x0) / dt, vz = (z1 - z0) / dt; const sp = Math.hypot(vx, vz), cap = cam.goal.dist * 2.5;
+  if (sp < cam.goal.dist * 0.25) return; if (sp > cap){ vx *= cap / sp; vz *= cap / sp; } fling.vx = vx; fling.vz = vz; }
+function stopFling(){ const was = Math.hypot(fling.vx, fling.vz) > cam.goal.dist * 0.3; fling.vx = fling.vz = 0; return was; }
+const GOAL_X = [-HALF - 40, HALF + 40], GOAL_Z = [-HALF - 60, HALF + 40];
+function clampGoal(){ const g = cam.goal; g.tx = clamp(g.tx, GOAL_X[0], GOAL_X[1]); g.tz = clamp(g.tz, GOAL_Z[0], GOAL_Z[1]); }
+function updateFling(dt){ if (!fling.vx && !fling.vz) return; const g = cam.goal; g.tx += fling.vx * dt; g.tz += fling.vz * dt; cam.follow = null;
+  if (g.tx <= GOAL_X[0] || g.tx >= GOAL_X[1]) fling.vx = 0; if (g.tz <= GOAL_Z[0] || g.tz >= GOAL_Z[1]) fling.vz = 0; clampGoal();
+  const k = Math.exp(-5.5 * dt); fling.vx *= k; fling.vz *= k; if (Math.hypot(fling.vx, fling.vz) < 0.5){ fling.vx = fling.vz = 0; } }
 function panBy(dx, dy){ const s = cam.goal.dist * 0.0018 * (900 / Math.max(innerHeight, 400)); const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw); cam.goal.tx += (-dx * cy - dy * sy) * s; cam.goal.tz += (dx * sy - dy * cy) * s; cam.follow = null; }
 function endPtr(e){ const p = ptrs.get(e.pointerId); if (!p) return; ptrs.delete(e.pointerId);
   if (gesture && gesture.hold) clearTimeout(gesture.hold);
-  if (gesture && ptrs.size === 0){ const tapped = !gesture.moved && !gesture.held && performance.now() - p.t < 450 && gesture.kind === 'one';
+  if (gesture && ptrs.size === 0){ const tapped = !gesture.moved && !gesture.held && !gesture.flung && performance.now() - p.t < 450 && gesture.kind === 'one';
+    if (gesture.kind === 'one' && gesture.moved && !gesture.ghost) releasePan();
+    if (gesture.held && tool && tool.kind === 'penmove') keepPenVisible();
     if (gesture.held){ if (ghost){ ghost.scale.setScalar(1); if (tool && tool.hover && tool.move) setPreview([tool.hover[0] + Math.floor((tool.move.w - 1) / 2), tool.hover[1] + Math.floor((tool.move.h - 1) / 2)]); } keepPreviewVisible(); }
     if (tapped){ if (tool) toolTap(p); else tap(p.x, p.y); }
     gesture = null; }
-  else if (ptrs.size === 1 && gesture && gesture.kind === 'two'){ gesture = { kind: 'one', moved: true, ghost: false }; } }
+  else if (ptrs.size === 1 && gesture && gesture.kind === 'two'){ gesture = { kind: 'one', moved: true, ghost: false }; const q = [...ptrs.values()][0]; startPan(q.x, q.y); } }
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
 canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.goal.dist = clamp(cam.goal.dist * Math.exp(e.deltaY * 0.0012), 12, 330); }, { passive: false });
 const keys = new Set(); window.addEventListener('keydown', (e) => { keys.add(e.key.toLowerCase()); if (e.key === 'Escape'){ if (tool) cancelTool(); else closeSheet(); } if (e.key === ' ' && G.running){ G.speed = G.speed ? 0 : 1; updateHUD(); e.preventDefault(); } });
@@ -1249,6 +1392,9 @@ function updateWild(dt){ for (const d of wild){ d.wait -= dt; if (d.wait < 0 && 
 
 /* ================= save / load ================= */
 function serialize(){
+  const hp = tool && tool.kind === 'penmove' && tool.p ? tool : null; if (hp) applyPenPose(hp.p, hp.o, hp.o.i0, hp.o.j0, 0, false);
+  try { return serialize0(); } finally { if (hp) applyPenPose(hp.p, hp.o, hp.at[0], hp.at[1], hp.r, false); } }
+function serialize0(){
   const paths = []; for (let k = 0; k < tileType.length; k++) if (tileType[k] === T_PATH) paths.push(k);
   const g = {}; for (const k in G) if (!['running', 'feeding', 'headless', 'score', 'avgHappy', 'tick', 'unlockAll', 'spawnAcc'].includes(k)) g[k] = G[k];
   return { v: 1, G: g, paths,
@@ -1323,7 +1469,7 @@ function frame(now){
   const modalOpen = !$('modal').classList.contains('hidden') || !$('tut').classList.contains('hidden');
   if (G.running && G.speed > 0 && !modalOpen){ let gdt = dt * G.speed; while (gdt > 0){ const s = Math.min(gdt, 0.05); simulate(s); gdt -= s; } }
   else for (const d of dinos){ if (d.model.root.visible){ d.model.animate(dt, 0, 0); } }
-  updateWild(dt); keyCamera(dt); updateCamera(dt); applyLighting(); updateParticles(dt); updateSmoke(dt);
+  tutTick(dt); updateWild(dt); keyCamera(dt); updateCamera(dt); applyLighting(); updateParticles(dt); updateSmoke(dt);
   if (rebuildFencesSoon){ rebuildFencesSoon = false; rebuildFences(); }
   if (gateMesh && gateMesh.userData.flames) for (const f of gateMesh.userData.flames){ const k = 0.85 + Math.sin(now * 0.017 + f.id) * 0.1 + Math.sin(now * 0.041) * 0.05; f.scale.set(1.6 * k, 2.2 * k, 1); }
   updateWarnMarkers(now / 1000);
@@ -1351,7 +1497,7 @@ window.__DP = {
   repair(penId){ const pen = pens.get(penId); for (const s of pen.segs){ s.cond = 1; s.broken = false; } releaseHeld(pen); rebuildFences(); showAlert(); },
   focus: focusOn, openSheet, closeSheet, setSpeed(s){ G.speed = s; }, setHour(h){ G.hour = h; }, setQuality, sim(sec){ let t = sec; while (t > 0){ const s = Math.min(t, 0.05); simulate(s); updateWild(s); t -= s; } }, tick(){ updateCamera(0.05); applyLighting(); renderer.render(scene, camera); },
   hourly(){ hourTick(); }, ready: false,
-  get tool(){ return tool; }, get camera(){ return camera; }, groundAt(x, y){ return groundAtScreen(x, y); }, get undo(){ return undoRec; }, startTool, undoLast, screenOf(i, j){ const v = new THREE.Vector3(tX(i), H(tX(i), tZ(j)), tZ(j)).project(camera); return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight]; }, tileType(i, j){ return tileType[idx(i, j)]; },
+  get tool(){ return tool; }, get camera(){ return camera; }, groundAt(x, y){ return groundAtScreen(x, y); }, get undo(){ return undoRec; }, startTool, undoLast, tutorial(k){ showTutorial(k); }, get tutK(){ return tutK; }, flowPerMin(){ return flowPerMin(); }, stars(){ G.stars = computeStars(); checkMissions(); return G.stars; }, get fling(){ return { ...fling }; }, serialize(){ return serialize(); }, load(){ return loadGame(); }, save(){ saveGame(); }, screenOf(i, j){ const v = new THREE.Vector3(tX(i), H(tX(i), tZ(j)), tZ(j)).project(camera); return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight]; }, tileType(i, j){ return tileType[idx(i, j)]; },
 };
 
 /* ================= init ================= */

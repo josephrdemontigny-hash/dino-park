@@ -177,6 +177,20 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 .pricectl .btn{flex:0 0 46px;padding:0}
 .pricectl b{font-family:var(--serif);font-size:22px;color:var(--amber2);min-width:64px;text-align:center}
 
+#money{cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#money .inc{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--bone2);white-space:nowrap;margin-top:1px}
+#money .inc.pos{color:var(--ok)} #money .inc.neg{color:#ff8a6a}
+.dots{display:flex;gap:6px;justify-content:center;margin:0 0 8px}
+.dots i{display:block;width:7px;height:7px;border-radius:50%;background:rgba(239,230,210,.22)}
+.dots i.d{background:var(--amber)} .dots i.on{background:var(--amber2);width:18px;border-radius:4px}
+#coach{position:absolute;left:calc(var(--sal) + 10px);right:calc(var(--sar) + 10px);top:calc(var(--sat) + 112px);z-index:7;border-radius:16px;padding:10px 12px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:box-shadow .3s}
+#coach.ok{box-shadow:0 0 0 2px var(--ok)}
+#coach .ct b{display:flex;align-items:center;gap:6px;font-family:var(--serif);font-size:17px}
+#coach .ct b svg.i{width:18px;height:18px;color:var(--ok)}
+#coach .ct span{display:block;font-size:13px;line-height:1.4;color:var(--bone);margin-top:2px}
+#coach .cb{display:flex;gap:8px;margin-top:8px} #coach .cb .btn{flex:1 1 0;min-height:36px;font-size:13px}
+#modal .tips .tip{padding:8px 0;border-bottom:1px solid var(--line)} #modal .tips .tip b{display:block;font-size:14px;margin-bottom:2px} #modal .tips .tip span{font-size:13px;line-height:1.45;color:var(--bone)}
+#tut .dots{justify-content:flex-start}
 /* landscape: dock becomes a left rail, sheets sit beside it */
 @media (orientation:landscape) and (max-height:560px){
   #dock{left:calc(var(--sal) + 8px);right:auto;top:calc(var(--sat) + 8px);bottom:calc(var(--sab) + 8px);flex-direction:column;width:72px;padding:5px}
@@ -190,6 +204,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
   #toasts{left:calc(var(--sal) + 86px);top:calc(var(--sat) + 104px)}
   #title .logo{margin-top:2vh} #title .logo h1{font-size:40px}
   #tut{padding-bottom:calc(var(--sab) + 14px);justify-content:flex-end}
+  #coach{left:auto;right:calc(var(--sar) + 10px);top:calc(var(--sat) + 8px);width:min(380px,40%)}
 }
 </style>
 </head>
@@ -198,7 +213,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 <div id="flash"></div>
 <div id="hud" class="hidden">
   <div id="bar" class="glass">
-    <div id="money"><span class="lbl">Funds</span><b id="moneyV">$0</b></div>
+    <div id="money" role="button" aria-label="Funds and income"><span class="lbl">Funds</span><b id="moneyV">$0</b><span id="incomeV" class="inc"></span></div>
     <div id="clock"><span class="lbl" id="dayV">Day 1</span><b id="timeV">08:00</b></div>
     <button class="hb" id="speedBtn" aria-label="Speed"></button>
     <button class="hb" id="soundBtn" aria-label="Sound"></button>
@@ -217,6 +232,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stro
 <div id="toolbar" class="glass hidden"></div>
 <div id="undoBar" class="glass hidden"></div>
 <div id="title" class="ov hidden"></div>
+<div id="coach" class="glass hidden"></div>
 <div id="tut" class="ov hidden"></div>
 <div id="modal" class="ov hidden"></div>
 <div id="loading"><div>LOADING ISLAND</div><i><u></u></i></div>
