@@ -195,7 +195,7 @@ export function curbGeo(){ const P = []; const r = mulberry(17); for (let i = 0;
 export function rockGeo(seed){ const r = mulberry(seed); const g = new THREE.IcosahedronGeometry(1, 2); const p = g.attributes.position;
   const offs = []; for (let i = 0; i < 6; i++) offs.push([r() * TAU, r() * TAU, 0.15 + r() * 0.2]);
   for (let i = 0; i < p.count; i++){ _v.fromBufferAttribute(p, i); let k = 1; for (const [a, b, s] of offs) k += Math.sin(_v.x * 2.3 + a) * Math.cos(_v.z * 2.1 + b) * s * 0.5; _v.multiplyScalar(k); _v.y *= 0.62; p.setXYZ(i, _v.x, _v.y, _v.z); }
-  g.computeVertexNormals(); return mergeColored([[g, (v, c) => c.setHex(0x8a8476).offsetHSL(0, 0, v.y * 0.08 - 0.03)]]); }
+  g.computeVertexNormals(); return mergeColored([[g, (v, c) => c.setHex(0x8a8476).offsetHSL(0, 0, v.y * 0.08 - 0.03)]], true); } /* keep UVs: the rock material is textured */
 
 /* ---------------- buildings (front faces +Z, footprint centred) ---------------- */
 const COL = { wood: 0x6b4c2e, woodD: 0x4a3420, thatch: 0x9c7b45, thatchD: 0x7a5c30, stone: 0x8d8576, stoneD: 0x6c6558, cream: 0xe6dcc4, concrete: 0xb9b4a8, metal: 0x6e7270, glass: 0x2e4a52, amber: 0xe0a43a, yellow: 0xf2c230, black: 0x1c1c18, red: 0xa8321f, green: 0x3c5a34, roof: 0x4b5a3c };
@@ -388,11 +388,11 @@ export const BLD_PALETTES = [
 export const SIGN = { visitor: [0, 'VISITOR CENTRE', '#2a1c10', '#e8a93a'], hatchery: [1, 'HATCHERY', '#e8e6de', '#1e2a2e'], food: [2, 'SNACKS', '#a8321f', '#f4ead0'], gift: [3, 'GIFT SHOP', '#3a2a18', '#e8c060'],
   restroom: [4, 'RESTROOMS', '#2c4a5c', '#f0f0e8'], ranger: [5, 'RANGERS', '#33402a', '#f2c230'],
   pizza: [6, 'PIZZA', '#1e5a2e', '#f4ead0'], icecream: [7, 'ICE CREAM', '#f2d8e0', '#8a2a4a'], coffee: [8, 'COFFEE', '#2a1c12', '#e8d2a8'], drinks: [9, 'COLD DRINKS', '#1c5a7a', '#f6f0d8'],
-  restaurant: [10, 'FOSSIL GRILL', '#3a2414', '#f0b048'], stand: [11, 'LAGOON SHOW', '#123a5a', '#e8f0f0'], aviary: [12, 'AVIARY', '#2a3a2a', '#e8e0c0'] };
+  restaurant: [10, 'FOSSIL GRILL', '#3a2414', '#f0b048'], stand: [11, 'LAGOON SHOW', '#123a5a', '#e8f0f0'], aviary: [12, 'AVIARY', '#2a3a2a', '#e8e0c0'], station: [13, 'MONORAIL', '#16384a', '#f2e6c4'] };
 const SIGN_POS = { visitor: [[0, 4.55, 5.39, 3.9, 0.66, 0]], hatchery: [[0, 4.2, 2.69, 3.0, 0.6, 0]], food: [[0, 4.15, 0.82, 2.2, 0.55, 0], [0, 4.15, 0.68, 2.2, 0.55, Math.PI]], gift: [[0, 2.6, 1.61, 1.75, 0.44, 0]],
   restroom: [[0, 2.38, 1.36, 2.0, 0.4, 0]], ranger: [[-1, 3.15, 0.66, 2.2, 0.48, 0]],
   pizza: [[0, 3.05, 1.36, 2.2, 0.55, 0]], icecream: [[0, 2.75, 1.26, 2.0, 0.5, 0]], coffee: [[0, 2.85, 1.42, 2.1, 0.5, 0]], drinks: [[0, 2.05, 1.66, 2.0, 0.45, 0]],
-  restaurant: [[0, 5.2, 3.32, 4.2, 0.9, 0]], stand: [[0, 5.3, -0.2, 3.6, 0.7, 0]] };
+  restaurant: [[0, 5.2, 3.32, 4.2, 0.9, 0]], stand: [[0, 5.3, -0.2, 3.6, 0.7, 0]], station: [[4.5, 9.75, 0, 4.6, 0.9, Math.PI / 2], [-4.5, 9.75, 0, 4.6, 0.9, -Math.PI / 2]] };
 export function signAtlasCanvas(){
   const c = mk(1024, 1024), g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 1024, 1024); // bottom row stays white: building bodies sample it
   for (const k in SIGN){ const [slot, text, bg, fg] = SIGN[k]; const x = (slot % 2) * 512, y = (slot >> 1) * 128;
@@ -461,6 +461,20 @@ export function buildingGeo(type, hi = true){
     case 'restroom': {
       add(box(3.4, 0.25, 3.0), COL.concrete, M(0, 0.12, 0)); add(box(3.2, 2.5, 2.6), 0xd8d2c2, M(0, 1.5, 0)); for (const sd of [-1, 1]) add(box(0.8, 1.8, 0.1), 0x3c5a6a, M(sd * 0.8, 1.15, 1.32));
       add(box(3.5, 0.25, 2.9), COL.metal, M(0, 2.85, 0, 0.06, 0, 0)); add(box(0.5, 0.5, 0.06), COL.cream, M(0, 2.1, 1.33)); break; }
+    case 'station': { // v10 monorail station, 2x2: the track runs along local Z through the middle, its top 7.2 m above the base
+      add(box(7.8, 0.35, 7.8), COL.concrete, M(0, 0.175, 0));
+      for (const [x, z] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) add(cyl(0.38, 0.5, 6.4, 10), COL.concrete, M(x, 3.3, z));
+      add(box(1.0, 1.0, 8.6), 0xbdb8ac, M(0, 6.7, 0)); add(box(0.62, 0.1, 8.6), 0x5a6266, M(0, 7.22, 0));
+      for (const sd of [-1, 1]){ add(box(2.4, 0.35, 8.4), COL.concrete, M(sd * 2.8, 6.9, 0)); add(box(0.22, 0.03, 8.4), COL.yellow, M(sd * 1.72, 7.09, 0));
+        add(box(2.6, 0.5, 0.35), COL.concrete, M(sd * 2.8, 6.55, 3.0)); add(box(2.6, 0.5, 0.35), COL.concrete, M(sd * 2.8, 6.55, -3.0));
+        rail(add, sd * 3.95, -4.1, sd * 3.95, 4.1, 8.05, COL.metal, 5);
+        for (const z of [-3.6, 3.6]) add(cyl(0.1, 0.1, 2.9, 6), COL.metal, M(sd * 3.7, 8.55, z));
+        add(box(0.14, 1.0, 9.0), COL.woodD, M(sd * 4.42, 9.75, 0)); }
+      add(box(9.0, 0.22, 9.2), COL.metal, M(0, 10.05, 0)); add(hip(9.0, 9.4, 1.3), COL.roof, M(0, 10.15, 0));
+      for (let k = 0; k < 16; k++) add(box(1.3, 0.12, 0.44), COL.concrete, M(3.0, 0.42 + k * 0.4, -3.6 + k * 0.42)); add(box(0.08, 7.0, 0.08), COL.metal, M(3.68, 3.8, 0));
+      add(box(1.7, 7.4, 1.7), COL.glass, M(-2.8, 3.7, -2.8)); add(box(1.9, 0.3, 1.9), COL.metal, M(-2.8, 7.5, -2.8)); for (const [x, z] of [[-3.7, -3.7], [-1.9, -3.7], [-3.7, -1.9], [-1.9, -1.9]]) add(box(0.12, 7.4, 0.12), COL.metal, M(x, 3.7, z));
+      add(box(1.9, 2.3, 1.5), COL.cream, M(-2.6, 1.5, 2.7)); add(box(1.2, 0.7, 0.08), COL.glass, M(-2.6, 1.8, 3.46)); add(hip(2.4, 2.0, 0.6), COL.roof, M(-2.6, 2.65, 2.7));
+      break; }
     case 'ranger': { // 2x2
       add(box(7.4, 0.4, 7.4), COL.concrete, M(0, 0.2, 0)); add(box(5, 3, 4), 0x56603e, M(-1, 1.9, -1.4)); add(box(5.4, 0.2, 4.6), COL.metal, M(-1, 3.5, -1.4, 0.1, 0, 0));
       add(box(1.2, 2, 0.1), 0x3a3426, M(-1, 1.4, 0.62)); add(box(1.6, 0.8, 0.1), COL.glass, M(-2.7, 2.2, 0.62)); add(box(1.6, 0.8, 0.1), COL.glass, M(0.7, 2.2, 0.62));
@@ -477,7 +491,7 @@ export function buildingGeo(type, hi = true){
   sg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(sg.attributes.position.count * 3).fill(1), 3)); if (sg.index) return mergeGeometries([body, sg.toNonIndexed()], false); return mergeGeometries([body, sg], false);
 }
 export const FOOT = { gate: [2, 1], visitor: [3, 3], hatchery: [2, 2], meat: [1, 1], plant: [1, 1], viewing: [1, 1], food: [1, 1], gift: [1, 1], restroom: [1, 1], ranger: [2, 2],
-  pizza: [1, 1], icecream: [1, 1], coffee: [1, 1], drinks: [1, 1], restaurant: [2, 2], stand: [2, 1], water: [1, 1], goat: [1, 1], fish: [1, 1], browse: [1, 1], insect: [1, 1] };
+  pizza: [1, 1], icecream: [1, 1], coffee: [1, 1], drinks: [1, 1], restaurant: [2, 2], stand: [2, 1], station: [2, 2], water: [1, 1], goat: [1, 1], fish: [1, 1], browse: [1, 1], insect: [1, 1] };
 
 /* ---------------- fences: panel spans x in [-2,2] at local origin, posts separate. hi adds per-tier detail (v7); lo is the v6 shape ---------------- */
 function sagWire(y, z, sag, r = 0.02){ const pts = []; for (let k = 0; k <= 8; k++){ const t = k / 8; pts.push(new THREE.Vector3(-2 + 4 * t, y - sag * 4 * t * (1 - t), z)); } return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 8, r, 3, false); }
@@ -548,6 +562,18 @@ export function guestGeos(hi = true){
     g.setAttribute('color', new THREE.BufferAttribute(c, 3)); g.setAttribute('aPart', new THREE.BufferAttribute(pa, 1)); g.setAttribute('aLeg', new THREE.BufferAttribute(la, 1)); for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'color', 'aPart', 'aLeg'].includes(k)) g.deleteAttribute(k); return g; });
   return mergeGeometries(geos, false);
 }
+/* v10 monorail car: 7 m long along +Z, sits on the beam top at y = 0; nose = streamlined lead car */
+export function trainCarGeo(nose){ const P = []; const add = (g, col, m) => P.push([g, col, m]); const L = 6.8;
+  for (const sd of [-1, 1]) add(box(0.14, 0.9, 5.4), 0x2e3236, M(sd * 0.62, -0.3, 0)); add(box(1.5, 0.32, 6.2), 0x2e3236, M(0, 0.16, 0));
+  const bodyL = nose ? L - 1.8 : L, bz = nose ? -0.9 : 0; add(box(2.5, 2.3, bodyL), 0xeeeeea, M(0, 1.45, bz));
+  add(box(2.54, 0.8, bodyL - 0.8), 0x22343c, M(0, 1.95, bz)); add(box(2.56, 0.24, bodyL), 0x1f7a8a, M(0, 1.05, bz)); add(box(2.56, 0.08, bodyL), COL.amber, M(0, 0.86, bz));
+  add(box(2.2, 0.22, bodyL - 0.4), 0xd8dad6, M(0, 2.7, bz)); add(box(1.2, 0.3, 1.6), 0xb8bcb8, M(0, 2.95, bz - 0.6));
+  for (const sd of [-1, 1]) add(box(0.04, 1.75, 1.0), 0x3a4448, M(sd * 1.27, 1.3, bz + 0.6));
+  if (nose){ const w = box(2.5, 2.3, 1.8); const p = w.attributes.position; for (let i = 0; i < p.count; i++){ if (p.getZ(i) > 0){ const y = p.getY(i); p.setZ(i, y > 0 ? -0.2 : 0.9); p.setX(i, p.getX(i) * (y > 0 ? 0.86 : 0.92)); } } w.computeVertexNormals();
+    add(w, 0xeeeeea, M(0, 1.45, L / 2 - 0.9)); add(box(1.9, 0.9, 0.1), 0x22343c, M(0, 2.05, L / 2 - 0.95, -0.95, 0, 0)); add(box(2.0, 0.2, 0.3), 0x1f7a8a, M(0, 0.95, L / 2 - 0.05));
+    for (const sd of [-1, 1]) add(new THREE.SphereGeometry(0.12, 8, 6), 0xfff4c0, M(sd * 0.8, 0.85, L / 2)); }
+  else for (const z of [-L / 2, L / 2]) add(box(1.6, 2.0, 0.2), 0x3a4448, M(0, 1.4, z));
+  return mergeColored(P); }
 export function jeepGeo(){
   const P = []; const add = (g, c, m) => P.push([g, c, m]);
   add(box(2.0, 0.9, 4.2), 0x4c5a34, M(0, 1.05, 0)); add(box(1.9, 0.7, 1.6), 0x4c5a34, M(0, 1.8, -0.6)); add(box(1.8, 0.55, 0.06), 0x2e3c40, M(0, 1.85, 0.25, -0.35, 0, 0));

@@ -95,6 +95,7 @@ const BUILD = {
   goat:     { name: 'Live Goat Corral', cost: 14000, upkeep: 350, desc: 'Inside an enclosure. Big carnivores prefer the hunt.', stars: 1, inPen: true },
   fish:     { name: 'Fish Chute', cost: 9000, upkeep: 220, desc: 'Inside an enclosure or lagoon. For Spinosaurus, Sarcosuchus, marine reptiles and pterosaurs.', stars: 0, inPen: true },
   insect:   { name: 'Insect Box', cost: 4000, upkeep: 90, desc: 'Inside an enclosure. Grubs for small quick species: Dilophosaurus, Dimorphodon, Gallimimus.', stars: 0, inPen: true },
+  station:  { name: 'Monorail Station', cost: 24000, upkeep: 350, desc: 'Elevated platform, 2 x 2, must touch a path. Link two stations with Monorail track to carry guests over the ridge.', stars: 0, noMove: true },
   visitor:  { name: 'Visitor Centre', cost: 0, upkeep: 300, desc: 'Food, restrooms and souvenirs.', stars: 0, fixed: true },
   gate:     { name: 'Main Gate', cost: 0, upkeep: 0, desc: 'Guests arrive here.', stars: 0, fixed: true },
 };
@@ -164,7 +165,10 @@ function coastR(x, z){ const a = Math.atan2(z, x); return 126 + (fbm(Math.cos(a)
 function coastR9(x, z){ const r = Math.hypot(x, z) || 1; return coastR(x, z) + 95 * sstep(0.3, -0.15, z / r); }
 const LAKES = []; // v9 lake enclosures carve a basin into the terrain: { x0, z0, x1, z1, wl (water level), depth, shore }
 function H(x, z){ let h = Hgen(x, z, true); for (let n = 0; n < LAKES.length; n++){ const L = LAKES[n]; if (x <= L.x0 || x >= L.x1 || z <= L.z0 || z >= L.z1) continue;
-  const e = Math.min(x - L.x0, L.x1 - x, z - L.z0, L.z1 - z) * clamp(0.3 + fbm(x * 0.05 + 7, z * 0.05 + 3) * 1.4, 0.25, 1.8); h = lerp(h, Math.min(h, L.wl - L.depth), sstep(0, L.shore, e)); } return h; }
+  const e = Math.min(x - L.x0, L.x1 - x, z - L.z0, L.z1 - z) * clamp(0.3 + fbm(x * 0.05 + 7, z * 0.05 + 3) * 1.4, 0.25, 1.8); h = lerp(h, Math.min(h, L.wl - L.depth), sstep(0, L.shore, e)); }
+  for (let n = 0; n < PADS.length; n++){ const P = PADS[n]; if (x <= P.x0 - P.sk || x >= P.x1 + P.sk || z <= P.z0 - P.sk || z >= P.z1 + P.sk) continue; const dx = Math.max(P.x0 - x, 0, x - P.x1), dz = Math.max(P.z0 - z, 0, z - P.z1); h = lerp(P.h, h, sstep(0, P.sk, Math.hypot(dx, dz))); }
+  return h; }
+const PADS = []; // v10: graded building pads on rough expansion ground { x0, z0, x1, z1, h, sk }
 const H0 = (x, z) => Hgen(x, z, false); // H0: the v8 island, used to tell old land from new
 function Hgen(x, z, nw){
   const d = Math.hypot(x, z * 0.96), R = nw ? coastR9(x, z) : coastR(x, z);
@@ -173,12 +177,33 @@ function Hgen(x, z, nw){
   // gate plaza flattening near the south entrance
   const pd = Math.hypot(x - 0, z - 100); if (pd < 40) h = lerp(h, Math.max(h, 1.1), sstep(40, 14, pd));
   const vd = Math.hypot(x - VOLC.x, z - VOLC.z);
+  if (nw){ h += roughAdd(x, z, land); h -= sstep(R + 30, R + 110, d) * 14; } // v10: the expansion is rough country; the seabed shelves away offshore
   if (vd < VOLC.r){ const k = 1 - vd / VOLC.r; let c = VOLC.h * Math.pow(k, 1.7) * (0.82 + 0.36 * fbm(x * 0.03, z * 0.03)); if (vd < 13) c -= (13 - vd) * 1.6; h = Math.max(h, c - 1.5 + land * 0); }
   // ridges on west/east rims beyond the plot
   if (!nw){ const rim = Math.max(Math.abs(x) - 118, 0); if (rim > 0) h += rim * 0.25 * fbm(x * 0.05, z * 0.05) * land; }
-  else { const hw = sstep(-112, -150, x) * land; if (hw > 0) h += hw * (2.5 + 5 * fbm(x * 0.02 + 9, z * 0.02 + 4)); } // v9 west highlands: rolling hills
   return h;
 }
+// v10: a rocky ridge rings the original park (paths cannot cross it, only the monorail), then broken hills, terraced cliffs and ravines out to the new coast
+let _rb = 0, _ri = 0, OLDD = null;
+// distance (m) from every grid cell centre to the nearest original-park tile, so the ridge hugs the old land exactly
+function oldDistField(){ const N = 104, O = 24, D = new Float32Array(N * N).fill(1e4); const q = [];
+  for (let j = 0; j < 56; j++) for (let i = 0; i < 56; i++){ const x0 = i * 4 - 112, z0 = j * 4 - 112; let mn = 1e9, mx = -1e9; for (const [a, b] of [[0, 0], [4, 0], [0, 4], [4, 4], [2, 2]]){ const h = Hgen(x0 + a, z0 + b, false); mn = Math.min(mn, h); mx = Math.max(mx, h); }
+    if (!(mn < 0.55 || mx > 7 || mx - mn > 1.9)){ const k = (j + O) * N + i + O; D[k] = 0; q.push(k); } }
+  const st = [[1, 0, 4], [-1, 0, 4], [0, 1, 4], [0, -1, 4], [1, 1, 5.657], [-1, 1, 5.657], [1, -1, 5.657], [-1, -1, 5.657]];
+  for (let h = 0; h < q.length; h++){ const k = q[h], i = k % N, j = (k / N) | 0; for (const [di, dj, c] of st){ const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue; const kk = jj * N + ii; if (D[kk] > D[k] + c + 0.01){ D[kk] = D[k] + c; q.push(kk); } } }
+  return D; }
+function oldDist(x, z){ if (!OLDD) OLDD = oldDistField(); const fx = (x + 208) / 4 - 0.5, fz = (z + 208) / 4 - 0.5; const cx = clamp(fx, 0, 103), cz = clamp(fz, 0, 103), ex = Math.hypot(fx - cx, fz - cz) * 4;
+  const i = Math.min(102, Math.floor(cx)), j = Math.min(102, Math.floor(cz)), u = cx - i, v = cz - j, D = OLDD;
+  return lerp(lerp(D[j * 104 + i], D[j * 104 + i + 1], u), lerp(D[(j + 1) * 104 + i], D[(j + 1) * 104 + i + 1], u), v) + ex; }
+function roughInfo(x, z){ const r = Math.hypot(x, z) || 1, s = z / r; const q = oldDist(x, z) - 2; // metres outside the original park
+  _rb = sstep(1.5, 9, q) * sstep(34, 20, q) * sstep(0.45, 0.05, s); _ri = sstep(12, 28, q) * sstep(0.3, -0.15, s); }
+function roughAdd(x, z, land){ roughInfo(x, z); let a = 0;
+  if (_rb > 0) a += _rb * land * (10 + 10 * fbm(x * 0.04 + 21, z * 0.04 + 3) + 4 * noise2(x * 0.15, z * 0.15));
+  if (_ri > 0){ let b = 3 + 13 * fbm(x * 0.011 + 31, z * 0.011 + 11); const rd = 1 - Math.abs(2 * noise2(x * 0.028 + 5, z * 0.028 + 2) - 1); b += rd * rd * 7;
+    const t = b / 3.4, f = t - Math.floor(t), tr = (Math.floor(t) + sstep(0.3, 0.7, f)) * 3.4; b = lerp(b, tr, sstep(0.4, 0.6, fbm(x * 0.02 + 2, z * 0.02 + 8))); // terraces: cliff bands
+    const rv = Math.abs(fbm(x * 0.008 + 5, z * 0.008 + 9) - 0.5); b -= sstep(0.045, 0, rv) * (b + 4); // ravines
+    a += _ri * land * b; }
+  return a; }
 const TERR = { cx: 0, cz: -70, size: 560, seg: 220 };
 const terrGeo = new THREE.PlaneGeometry(TERR.size, TERR.size, TERR.seg, TERR.seg); terrGeo.rotateX(-Math.PI / 2); terrGeo.translate(TERR.cx, 0, TERR.cz);
 {
@@ -221,7 +246,7 @@ terrMat.onBeforeCompile = (sh) => { Object.assign(sh.uniforms, TU);
     vec3 gv = texture2D(tGravel, vWP.xz / 4.0).rgb * vec3(0.86, 0.78, 0.62);
     col = mix(col, mix(col, di * 0.78, 0.55), mk.b * (1.0 - smoothstep(0.25, 0.65, mk.r)));
     col = mix(col, gv, smoothstep(0.25, 0.65, mk.r));
-    col *= mix(0.4, 1.0, smoothstep(-3.0, 0.2, vWP.y));
+    col *= mix(0.4, 1.0, smoothstep(-3.0, 0.2, vWP.y)) * mix(0.9, 1.0, smoothstep(-16.0, -6.0, vWP.y)); // v10: deep seabed fades out so the terrain square does not show from far away
     if (uGrid > 0.5 && mk.a >= 0.0){ vec2 g = abs(fract((vWP.xz - uMask.xy) / ${TILE.toFixed(1)}) - 0.5); float l = smoothstep(0.47, 0.495, max(g.x, g.y)); if (muv.x > 0.0 && muv.y > 0.0 && muv.x < 1.0 && muv.y < 1.0) col = mix(col, vec3(0.95, 0.85, 0.55), l * 0.35); }
     diffuseColor.rgb *= col;`);
 };
@@ -230,6 +255,7 @@ const terrain = new THREE.Mesh(terrGeo, terrMat); terrain.receiveShadow = true; 
 
 /* ================= water ================= */
 const waterMat = new THREE.MeshStandardMaterial({ color: 0x1b4a4a, roughness: 0.08, metalness: 0.0, transparent: true, opacity: 0.84, normalMap: TEX.water, normalScale: new THREE.Vector2(0.28, 0.28), envMapIntensity: 1.1 });
+const seabed = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x8a7a5c, roughness: 1 })); seabed.position.y = -21.6; scene.add(seabed); // v10: open-sea floor level with the shelved terrain edge, so the terrain square never shows
 const water = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2), waterMat); water.position.y = 0.0; water.receiveShadow = true; water.renderOrder = 2; scene.add(water);
 // surf ring: a soft light band at the shoreline drawn on the water
 // volcano smoke
@@ -281,7 +307,8 @@ function scatterVegetation(){
     for (let t = 0; t < tries[kind] && V.items.length < cap; t++){
       const x = TERR.cx + (r() - 0.5) * TERR.size * 0.92, z = TERR.cz + (r() - 0.5) * TERR.size * 0.92; const h = H(x, z);
       if (h < (kind === 'palm' ? 0.6 : 1.0) || h > (kind === 'rock' ? 50 : 34)) continue;
-      const slope = Math.abs(H(x + 2, z) - h) + Math.abs(H(x, z + 2) - h); if (slope > (kind === 'rock' ? 3 : 1.6)) continue;
+      const nl = H0(x, z) < 0.6; if (nl) roughInfo(x, z); const rgh = nl ? Math.max(_rb, _ri) : 0;
+      const slope = Math.abs(H(x + 2, z) - h) + Math.abs(H(x, z + 2) - h); if (slope > (kind === 'rock' ? 3 + rgh * 4 : 1.6)) continue;
       const i = toI(x), j = toI(z), inside = Math.abs(x) < HALF - 6 && Math.abs(z) < HALF - 6;
       // density: jungle thick at the plot border, sparse clearing inside
       const edge = inside ? sstep(HALF - 40, HALF - 4, Math.max(Math.abs(x), Math.abs(z))) : 1;
@@ -290,7 +317,7 @@ function scatterVegetation(){
       if (VEG_SMALL.has(kind)) dens = (inside ? 0.55 + edge * 0.3 : 0.35) * (0.5 + clump * 0.7) * (kind === 'flower' ? 0.6 : 1);
       else if (inside) dens *= kind === 'bush' || kind === 'fern' || kind === 'shrub' ? 0.35 + edge * 0.65 : kind === 'rock' ? 0.4 : kind === 'log' || kind === 'stump' ? 0.12 + edge * 0.88 : 0.08 + edge * 0.92;
       if (Math.hypot(x, z - 96) < 30) dens = 0; // keep the gate plaza clear
-      if (H0(x, z) < 0.6) dens *= 0.16; // v9 new land: lighter forest, keeps the triangle budget near v8
+      if (nl) dens *= kind === 'rock' ? 0.5 + rgh * 2.4 : (kind.startsWith('broad') || kind === 'cycad' ? 0.2 + _ri * 0.75 : 0.16 + _ri * 0.45) * (1 - 0.75 * _rb); // v10 new land: rocky ridge, jungle in the hollows (triangle budget near v9)
       if (r() > dens) continue;
       const sc = kind === 'rock' ? 0.6 + r() * 2.2 : kind.startsWith('broad') ? 0.75 + r() * 0.5 : kind === 'palm' ? 0.8 + r() * 0.45 : kind === 'cycad' ? 0.8 + r() * 0.7 : VEG_SMALL.has(kind) ? 0.75 + r() * 0.6 : kind === 'log' || kind === 'stump' ? 0.8 + r() * 0.4 : 0.7 + r() * 0.8;
       e.set(kind === 'rock' ? r() * 0.4 : (r() - 0.5) * 0.08, r() * TAU, kind === 'rock' ? r() * 0.4 : (r() - 0.5) * 0.08); q.setFromEuler(e); s.set(sc, sc * (kind.startsWith('broad') ? 0.85 + r() * 0.35 : 1), sc); p.set(x, h - (kind === 'rock' ? 0.4 * sc : VEG_SMALL.has(kind) ? 0.04 : kind === 'log' ? 0.1 : 0.15), z);
@@ -298,11 +325,15 @@ function scatterVegetation(){
     }
   }
 }
+const monoClearT = new Uint8Array(GN * GN); // v10: jungle cleared along monorail track and around stations
+function monoClearMask(){ monoClearT.fill(0); const mark = (x, z, r) => { const ci = Math.floor((x + HALF) / TILE), cj = Math.floor((z + HALF) / TILE); for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) if (inGrid(ci + di, cj + dj)) monoClearT[idx(ci + di, cj + dj)] = 1; };
+  try { for (const L of MONO.lines) for (const p of L.path.pts) mark(p.x, p.z, 1); for (const b of buildings.values()) if (b.type === 'station') mark(b.x, b.z, 2); } catch (e) { /* called before the monorail module is set up */ } }
 function vegBlocked(it){ // trees cleared by paths, buildings and fence lines
   for (const L of LAKES) if (it.x > L.x0 - it.r - 1 && it.x < L.x1 + it.r + 1 && it.z > L.z0 - it.r - 1 && it.z < L.z1 + it.r + 1) return true;
   if (!inGrid(it.i, it.j)) return false;
   const k = idx(it.i, it.j), ty = tileType[k];
   if (ty === T_PATH || ty === T_BUILD) return true;
+  if (monoClearT[k] && !it.small) return true;
   if (it.small && ty === T_PEN) return true;
   if (ty === T_PEN || tileType[k] === T_PEN){ const pen = pens.get(tileRef[k]); if (pen){ const x0 = eX(pen.i0), x1 = eX(pen.i1 + 1), z0 = eX(pen.j0), z1 = eX(pen.j1 + 1);
     const d = Math.min(it.x - x0, x1 - it.x, it.z - z0, z1 - it.z); if (d < it.r + 0.8) return true; if (pen.feeders.some(f => Math.hypot(tX(f.i) - it.x, tZ(f.j) - it.z) < 4)) return true; } }
@@ -313,6 +344,7 @@ function vegBlocked(it){ // trees cleared by paths, buildings and fence lines
 }
 let camObsDirty = true; // camera-obstacle boxes need a rebuild
 function refreshVegetation(){
+  monoClearMask();
   const lvl = QUALITY.veg[QUALITY.level];
   for (const kind in VEG){ const V = VEG[kind]; let n = 0; const lim = VEG_HI.has(kind) && QUALITY.level === 0 ? 0 : Math.floor(V.items.length * lvl);
     if (VEG_SMALL.has(kind)){ V.cand = []; for (let a = 0; a < lim; a++){ const it = V.items[a]; if (!vegBlocked(it)) V.cand.push(it); } continue; }
@@ -323,6 +355,8 @@ function refreshVegetation(){
 
 /* ================= world state ================= */
 const T_LOCK = -2, T_BLOCK = -1, T_EMPTY = 0, T_PATH = 1, T_BUILD = 2, T_PEN = 3; // T_LOCK: new land, buildable after the expansion permit
+const ridgeMask = new Uint8Array(GN * GN); // v10: tiles on the border ridge / ring
+const tileGrade = new Float32Array(GN * GN); // v10: metres of relief across each new-land tile (grading cost)
 const tileType = new Int8Array(GN * GN), tileRef = new Int32Array(GN * GN).fill(-1), tileH = new Float32Array(GN * GN), tileBase = new Int8Array(GN * GN);
 const buildings = new Map(), pens = new Map();
 let dinos = [], eggs = [];
@@ -330,24 +364,38 @@ let G = null;
 function freshState(){ return { v: 1, econ6: true, money: 300000, day: 1, hour: OPEN - 0.5, price: 35, rep: 55, safety: 85, stars: 0, speed: 1, nextId: 1,
   ledger: { tickets: 0, shops: 0, upkeep: 0, feed: 0, build: 0, hatch: 0, fines: 0, other: 0 }, prevLedger: null,
   stats: { guestsTotal: 0, guestsToday: 0, deaths: 0, fed: 0, breakouts: 0, hatched: 0, carnHatched: 0, bestProfit: -1e9, trex: 0 },
-  missions: [], thrill: 0, tutorialDone: false, feedCooldown: 0, v9: true, bldPal: 'classic', spScheme: {} }; }
+  missions: [], thrill: 0, tutorialDone: false, feedCooldown: 0, v9: true, v10: true, bldPal: 'classic', spScheme: {}, mono: { lines: [] } }; }
 const GATE = { i: 27, j: 53 };
 const LOCK_WHY = 'New land: buy the Expansion permit in Park first';
 let buildableCache = null;
 function computeBuildable(){
   if (buildableCache){ tileType.set(buildableCache); return; }
   const test = (i, j, h, maxH) => { const x0 = eX(i), z0 = eX(j), hs = [h(x0, z0), h(x0 + TILE, z0), h(x0, z0 + TILE), h(x0 + TILE, z0 + TILE), h(x0 + 2, z0 + 2)];
-    const mn = Math.min(...hs), mx = Math.max(...hs); return { ok: !(mn < 0.55 || mx > maxH || mx - mn > 1.9), c: hs[4] }; };
+    const mn = Math.min(...hs), mx = Math.max(...hs); return { ok: !(mn < 0.55 || mx > maxH || mx - mn > 1.9), c: hs[4], mn, mx }; };
+  tileGrade.fill(0);
   for (let j = LO; j < HI; j++) for (let i = LO; i < HI; i++){ const k = idx(i, j);
-    const old = i >= 0 && j >= 0 && i < GRID && j < GRID && test(i, j, H0, 7).ok; const n = test(i, j, H, 14); tileH[k] = n.c;
-    tileType[k] = old ? T_EMPTY : (n.ok && j < GRID) ? T_LOCK : T_BLOCK; }
+    const old = i >= 0 && j >= 0 && i < GRID && j < GRID && test(i, j, H0, 7).ok; const n = test(i, j, H, 40); tileH[k] = n.c; let t = old ? T_EMPTY : T_BLOCK;
+    // v10 new land is rough but buildable (grading costs extra); cliffs and the border ridge are not
+    if (!old && j < GRID && n.mn >= 0.55 && n.mx <= 40 && n.mx - n.mn <= 6){ roughInfo(eX(i) + 2, eX(j) + 2); if (_rb <= 0.12){ t = T_LOCK; tileGrade[k] = n.mx - n.mn; } }
+    tileType[k] = t; }
+  // the old park and the expansion never touch: a ring of rough ground always separates them, so footpaths cannot cross (the monorail can)
+  const ring = []; for (let j = LO; j < HI; j++) for (let i = LO; i < HI; i++){ const k = idx(i, j); if (tileType[k] !== T_LOCK) continue;
+    let adj = false; for (let dj = -1; dj <= 1 && !adj; dj++) for (let di = -1; di <= 1; di++){ if (inGrid(i + di, j + dj) && tileType[idx(i + di, j + dj)] === T_EMPTY){ adj = true; break; } } if (adj) ring.push(k); }
+  ridgeMask.fill(0); for (const k of ring){ tileType[k] = T_BLOCK; tileGrade[k] = 0; ridgeMask[k] = 1; }
+  for (let j = LO; j < GRID; j++) for (let i = LO; i < HI; i++){ const k = idx(i, j); if (tileType[k] !== T_BLOCK || ridgeMask[k]) continue; roughInfo(eX(i) + 2, eX(j) + 2); if (_rb > 0.12 && tileH[k] > 0.55) ridgeMask[k] = 1; }
   buildableCache = tileType.slice(); tileBase.set(buildableCache);
 }
 // the expansion permit opens every T_LOCK tile; old parks keep their layout and gain the new land
 function applyExpansion(){ if (!G || !G.expand) return; for (let k = 0; k < tileType.length; k++) if (tileType[k] === T_LOCK) tileType[k] = T_EMPTY; }
 function landCounts(){ let open = 0, locked = 0, old = 0; for (let k = 0; k < tileBase.length; k++){ if (tileBase[k] === T_EMPTY) old++; if (tileBase[k] === T_LOCK) locked++; } return { old, locked, total: old + locked }; }
+// v10 grading: levelling rough expansion ground costs extra, per metre of relief on each tile
+const GRADE = { path: 60, bld: 1400, pen: 90 };
+const isExpK = k => tileBase[k] === T_LOCK;
+function gradeCost(i0, j0, i1, j1, rate){ let s = 0; for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){ if (!inGrid(i, j)) continue; const k = idx(i, j); if (tileBase[k] === T_LOCK) s += Math.max(0, tileGrade[k] - 0.4); } return Math.round(s * rate / 10) * 10; }
+function bldCost(type, i, j){ const B = BUILD[type]; if (B.inPen) return B.cost; const [w, h] = footprint(type, 0); return B.cost + gradeCost(i, j, i + w - 1, j + h - 1, GRADE.bld); }
+function pathTilesCost(tiles){ let c = 0; for (const [i, j] of tiles) c += BUILD.path.cost + gradeCost(i, j, i, j, GRADE.path); return c; }
 function buyExpansion(){ if (G.expand) return false; if (G.money < EXPAND_COST){ toast('Not enough funds for the expansion permit.', 'bad'); return false; }
-  spend('build', EXPAND_COST); G.expand = true; applyExpansion(); afterStructureChange(); SFX.build(); toast('Expansion permit granted: the east lowlands, west highlands and northern valleys are open to build on.', 'good'); return true; }
+  spend('build', EXPAND_COST); G.expand = true; applyExpansion(); afterStructureChange(); SFX.build(); toast('Expansion permit granted. The new land is rough country beyond a rocky ridge: no footpath crosses it. Build a Monorail Station in the park and one out there, then link them with Monorail track (Build > Paths).', 'good'); return true; }
 const idx = (i, j) => (j + OFF) * GN + (i + OFF);
 const isPath = (i, j) => inGrid(i, j) && tileType[idx(i, j)] === T_PATH;
 
@@ -435,6 +483,9 @@ function placeBuilding(type, i, j, opts = {}){
   else for (let dj = 0; dj < h; dj++) for (let di = 0; di < w; di++){ const k = idx(i + di, j + dj); tileType[k] = T_BUILD; tileRef[k] = id; }
   b.rot = opts.rot !== undefined ? opts.rot : (B.inPen ? 0 : faceRot(i, j, w, h));
   const cx = tX(i) + (w - 1) * TILE / 2, cz = tZ(j) + (h - 1) * TILE / 2; let mn = 99; for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]]) mn = Math.min(mn, H(cx + dx * w * TILE * 0.45, cz + dz * h * TILE * 0.45));
+  if (!B.inPen && type !== 'stand'){ let ex = false, gr = 0; for (let dj = 0; dj < h; dj++) for (let di = 0; di < w; di++){ const k = idx(i + di, j + dj); if (tileBase[k] === T_LOCK || tileGrade[k] > 0){ ex = true; gr = Math.max(gr, tileGrade[k]); } }
+    if (ex && gr > 0.5){ let s2 = 0; const S = [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]]; for (const [dx, dz] of S) s2 += H(cx + dx * w * TILE * 0.45, cz + dz * h * TILE * 0.45); // v10: level a pad on rough ground
+      const pad = { x0: eX(i) + 0.4, z0: eX(j) + 0.4, x1: eX(i + w) - 0.4, z1: eX(j + h) - 0.4, h: s2 / S.length, sk: 3.5 }; PADS.push(pad); b.pad = pad; retopo(pad.x0 - 4, pad.z0 - 4, pad.x1 + 4, pad.z1 + 4); mn = pad.h; } }
   if (b.pen >= 0){ const pp = pens.get(b.pen); const L = lakeAt(cx, cz); if (pp && pp.kind === 'lagoon') mn = 0.15; else if (L && mn < L.wl) mn = L.wl + 0.05; }
   if (type === 'stand') mn = Math.max(mn, 0.25);
   const mesh = makeBuildingMesh(type); mesh.position.set(cx, mn - 0.05, cz); setBldPal(mesh, palOf(b)); mesh.rotation.y = b.rot; scene.add(mesh); b.mesh = mesh; b.x = cx; b.z = cz;
@@ -442,6 +493,8 @@ function placeBuilding(type, i, j, opts = {}){
 }
 function removeBuilding(b){
   scene.remove(b.mesh); buildings.delete(b.id); camObsDirty = true;
+  if (b.pad){ const n = PADS.indexOf(b.pad); if (n >= 0) PADS.splice(n, 1); retopo(b.pad.x0 - 4, b.pad.z0 - 4, b.pad.x1 + 4, b.pad.z1 + 4); b.pad = null; }
+  if (b.type === 'station') monoStationGone(b);
   if (b.pen >= 0){ const pen = pens.get(b.pen); if (pen) pen.feeders = pen.feeders.filter(f => f.id !== b.id); }
   else for (let dj = 0; dj < b.h; dj++) for (let di = 0; di < b.w; di++){ const k = idx(b.i + di, b.j + dj); tileType[k] = tileBase[k] === T_BLOCK ? T_BLOCK : T_EMPTY; tileRef[k] = -1; }
 }
@@ -523,7 +576,7 @@ function penCanBuild(i0, j0, i1, j1, kind = 'land'){
   return { ok: true };
 }
 function penCost(i0, j0, i1, j1, tier, kind = 'land'){ const per = 2 * (i1 - i0 + 1) + 2 * (j1 - j0 + 1), area = (i1 - i0 + 1) * (j1 - j0 + 1);
-  return per * FT[tier].cost * (kind === 'lagoon' ? 1.3 : 1) + area * 60 + (kind === 'aviary' ? area * 700 : kind === 'lake' ? area * 450 : kind === 'lagoon' ? area * 150 : 0); }
+  return per * FT[tier].cost * (kind === 'lagoon' ? 1.3 : 1) + area * 60 + (kind === 'aviary' ? area * 700 : kind === 'lake' ? area * 450 : kind === 'lagoon' ? area * 150 : 0) + gradeCost(i0, j0, i1, j1, GRADE.pen); }
 function createPen(i0, j0, i1, j1, tier, opts = {}){
   const kind = opts.kind || 'land'; const id = opts.id || G.nextId++; const pen = { id, i0, j0, i1, j1, tier, kind, feeders: [], name: opts.name || ((kind === 'aviary' ? 'Aviary ' : kind === 'lagoon' ? 'Lagoon ' : kind === 'lake' ? 'Lake ' : 'Enclosure ') + (pens.size + 1)) };
   pen.geom = penSegments(pen); pen.segs = pen.geom.map((_, k) => ({ cond: opts.segs ? opts.segs[k] : 1, broken: opts.broken ? opts.broken.includes(k) : false }));
@@ -583,7 +636,7 @@ function spawnDino(sp, pen, opts = {}){
   const model = new Dino(sp); scene.add(model.root);
   const m = Math.min(1.5 + SPECIES_DATA[sp].size * 0.18, (pen.i1 - pen.i0 + 1) * TILE / 2 - 0.5);
   const [x, z] = opts.x !== undefined ? [opts.x, opts.z] : randomPenPoint(pen, m);
-  const used = new Set(dinos.map(d => d.name)); const name = opts.name || NAMES.find(n => !used.has(n)) || NAMES[(rnd() * NAMES.length) | 0];
+  const used = new Set(dinos.map(d => d.name)); const name = cleanName(opts.name) || NAMES.find(n => !used.has(n)) || NAMES[(rnd() * NAMES.length) | 0];
   const d = { id: opts.id || G.nextId++, sp, pen: pen.id, x, z, hd: rnd() * TAU, v: 0, tx: x, tz: z, wait: 1 + rnd() * 3, state: opts.state || 'pen', hunger: opts.hunger ?? 0.25, thirst: opts.thirst ?? 0.2, stress: 0, alt: 0, huntCD: 4 + rnd() * 6, injT: 0, name, model, darts: 0, sleep: 0, sedT: 0, eatT: 0, roarCD: 5 + rnd() * 20, killCD: 0, fedSkip: opts.fedSkip || 0, lastStep: 0, visible: true };
   if (d.state === 'holding'){ model.root.visible = false; }
   const sc = opts.sc ?? (G.spScheme && G.spScheme[sp] ? G.spScheme[sp].sc : null), pt = opts.pt ?? (G.spScheme && G.spScheme[sp] ? G.spScheme[sp].pt : -1);
@@ -887,7 +940,7 @@ function computeViewMap(){
     const vis = pen.tier === 3 && pen.kind !== 'lagoon' ? 0.4 : 1; const wet = pen.kind === 'lagoon' || pen.kind === 'lake';
     for (let j = pen.j0 - 5; j <= pen.j1 + 5; j++) for (let i = pen.i0 - 5; i <= pen.i1 + 5; i++){ if (!isPath(i, j)) continue; const dd = Math.max(pen.i0 - i, 0, i - pen.i1, pen.j0 - j, 0, j - pen.j1);
       let v = ap * (1 - dd / 6) * vis; for (const p of plats){ if (Math.abs(p.i - i) <= 2 && Math.abs(p.j - j) <= 2 && Math.max(pen.i0 - p.i, 0, p.i - pen.i1, pen.j0 - p.j, 0, p.j - pen.j1) <= 3){ v *= p.type === 'stand' ? (wet ? 2.6 : 1.3) : pen.tier === 3 && !wet ? 2.6 : 1.6; break; } }
-      viewMap[idx(i, j)] += v; if (v > sv && exitDist[idx(i, j)] < 1e6){ sv = v; spot = idx(i, j); } }
+      viewMap[idx(i, j)] += v; if (v > sv && reachK(idx(i, j))){ sv = v; spot = idx(i, j); } }
     if (spot >= 0) penSpots.push({ pen: pen.id, k: spot, ap }); }
 }
 /* ---- guest destinations: walk the connected path network to a chosen spot (an unseen exhibit, a shop when needed, or a far corner), linger, pick the next ---- */
@@ -897,9 +950,9 @@ function pathField(k){ let f = pathFields.get(k); if (f) return f; if (pathField
   while (h < q.length){ const c = q[h++]; const i = kI(c), j = kJ(c); for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const ii = i + di, jj = j + dj; if (!isPath(ii, jj)) continue; const kk = idx(ii, jj); if (f[kk] < 0){ f[kk] = f[c] + 1; q.push(kk); } } }
   pathFields.set(k, f); return f; }
 function rebuildGuestSpots(){ pathFields.clear(); shopSpots = []; explorable = [];
-  for (let k = 0; k < GN * GN; k++) if (tileType[k] === T_PATH && exitDist[k] < 1e6 && kJ(k) < GATE.j) explorable.push(k);
+  for (let k = 0; k < GN * GN; k++) if (tileType[k] === T_PATH && reachK(k) && kJ(k) < GATE.j) explorable.push(k);
   for (const b of buildings.values()){ if (!SHOP_T.includes(b.type)) continue; const seen = new Set();
-    for (let dj = -1; dj <= b.h; dj++) for (let di = -1; di <= b.w; di++){ if ((di === -1 || di === b.w) === (dj === -1 || dj === b.h)) continue; const i = b.i + di, j = b.j + dj; if (!isPath(i, j)) continue; const k = idx(i, j); if (exitDist[k] >= 1e6 || seen.has(k)) continue; seen.add(k); shopSpots.push({ k, type: b.type, i, j }); } } }
+    for (let dj = -1; dj <= b.h; dj++) for (let di = -1; di <= b.w; di++){ if ((di === -1 || di === b.w) === (dj === -1 || dj === b.h)) continue; const i = b.i + di, j = b.j + dj; if (!isPath(i, j)) continue; const k = idx(i, j); if (!reachK(k) || seen.has(k)) continue; seen.add(k); shopSpots.push({ k, type: b.type, i, j }); } } }
 function pickDest(g){ const here = idx(g.ci, g.cj); const pick = (arr) => { let tot = 0; for (const o of arr) tot += o.w; let r = rnd() * tot; for (const o of arr){ r -= o.w; if (r <= 0) return o; } return arr[arr.length - 1]; };
   const near = (types, goal) => { const c = shopSpots.filter(s => types.includes(s.type) && s.k !== here); if (!c.length) return null; const f = pathField(here);
     const o = c.map(s => ({ k: s.k, d: f[s.k] < 0 ? 1e4 : f[s.k] })).filter(o => o.d < 1e4).sort((a, b) => a.d - b.d); return o.length ? { k: o[Math.min(o.length - 1, (rnd() * 2) | 0)].k, goal } : null; };
@@ -908,17 +961,24 @@ function pickDest(g){ const here = idx(g.ci, g.cj); const pick = (arr) => { let 
   if (!d && g.hunger > 0.55 && g.money > 15) d = near(FOOD_T, 'food');
   if (!d && (g.thirst || 0) > 0.6 && g.money > 6) d = near(DRINK_T, 'drink');
   if (!d){ const opts = [];
-    for (const s of penSpots){ if (s.k === here) continue; opts.push({ k: s.k, goal: 'view', pen: s.pen, w: (8 + s.ap) * (g.seen.has(s.pen) ? 0.15 : 1.6) }); }
-    if (explorable.length){ let best = -1, bd = -1; for (let n = 0; n < 5; n++){ const k = explorable[(rnd() * explorable.length) | 0]; const dd = Math.abs(kI(k) - g.ci) + Math.abs(kJ(k) - g.cj); if (dd > bd){ bd = dd; best = k; } } if (best >= 0 && best !== here) opts.push({ k: best, goal: 'explore', w: 14 }); }
-    const gift = shopSpots.filter(s => s.type === 'gift'); if (gift.length && g.happy > 62 && g.money > 30 && !g.boughtGift) opts.push({ k: gift[(rnd() * gift.length) | 0].k, goal: 'gift', w: 12 });
+    const myc = pcomp[here];
+    for (const s of penSpots){ if (s.k === here || pcomp[s.k] !== myc) continue; opts.push({ k: s.k, goal: 'view', pen: s.pen, w: (8 + s.ap) * (g.seen.has(s.pen) ? 0.15 : 1.6) }); }
+    if (MONO.lines.length && g.money >= MONO_FARE) for (const o of monoOptions(g, here)) if (o.k >= 0) opts.push(o);
+    if (explorable.length){ let best = -1, bd = -1; for (let n = 0; n < 8; n++){ const k = explorable[(rnd() * explorable.length) | 0]; if (pcomp[k] !== myc) continue; const dd = Math.abs(kI(k) - g.ci) + Math.abs(kJ(k) - g.cj); if (dd > bd){ bd = dd; best = k; } } if (best >= 0 && best !== here) opts.push({ k: best, goal: 'explore', w: 14 }); }
+    const gift = shopSpots.filter(s => s.type === 'gift' && pcomp[s.k] === myc); if (gift.length && g.happy > 62 && g.money > 30 && !g.boughtGift) opts.push({ k: gift[(rnd() * gift.length) | 0].k, goal: 'gift', w: 12 });
     if (opts.length) d = pick(opts); }
-  if (d){ g.dest = d.k; g.goal = d.goal; g.goalPen = d.pen ?? -1; } else { g.dest = -1; g.goal = 'wander'; } }
+  if (d){ g.dest = d.k; g.goal = d.goal; g.goalPen = d.pen ?? -1; if (d.goal === 'mono'){ g.mBid = d.bid; g.mTo = d.to; g.mLine = d.line; } } else { g.dest = -1; g.goal = 'wander'; } }
 function stepToward(g){ const f = pathField(g.dest); const here = f[idx(g.ci, g.cj)]; if (here < 0) return null; let best = null, bd = here;
   for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const ii = g.ci + di, jj = g.cj + dj; if (!isPath(ii, jj)) continue; const v = f[idx(ii, jj)]; if (v >= 0 && (v < bd || (v === bd && best && rnd() < 0.5))){ bd = v; best = [ii, jj]; } }
   return bd < here ? best : null; }
 /* ---- what guests want ---- */
 const GNAMES = ['Ava', 'Ben', 'Chloe', 'Dev', 'Ella', 'Finn', 'Grace', 'Hugo', 'Isla', 'Jack', 'Kai', 'Lena', 'Max', 'Nora', 'Omar', 'Pia', 'Quinn', 'Rosa', 'Sam', 'Tara', 'Uma', 'Vic', 'Wes', 'Yara', 'Zoe', 'Leo', 'Mia', 'Noah', 'Ivy', 'Eli'];
 const GLAST = 'ABCDEFGHJKLMNPRSTVW';
+const NAME_MAX = 16;
+function cleanName(v){ return String(v || '').normalize('NFC').replace(/[^\p{L}\p{N}\p{M} '\-.!?&]/gu, '').replace(/&/g, '+').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX).trim(); }
+const escH = (v) => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+function renameDino(d, v){ const n = cleanName(v); if (!d || !n) return false; if (n === d.name) return true; const old = d.name; d.name = n; toast(`${old} is now called ${n}.`, 'good'); return true; }
+function guestFavDino(g){ if (!g.seen || !g.seen.size) return null; let best = null, bs = -1; for (const d of dinos){ if (!g.seen.has(d.pen) || d.state === 'carcass') continue; const sc = SPECIES[d.sp].appeal + ((d.id * 7 + g.id * 13) % 11); if (sc > bs){ bs = sc; best = d; } } return best; }
 function guestName(g){ return g.name || (g.name = GNAMES[g.id % GNAMES.length] + ' ' + GLAST[(g.id * 7) % GLAST.length] + '.'); }
 function guestThought(g){ if (g.gone) return null;
   if (g.state === 'flee' || g.state === 'lured' || g.state === 'tossed' || g.state === 'inpen') return 'scared';
@@ -955,7 +1015,7 @@ function guestNeeds(){ const inPark = guests.filter(g => !g.gone && (g.state ===
   const tip = { food: (a) => has('food') ? `Add another Food Stand by the ${where(a)} path, or bring paths past the one you have.` : `Build a Food Stand touching the ${where(a)} path. Each meal pays ${fmt(FOOD_PRICE)}.`,
     thirst: (a) => DRINK_T.some(has) ? `Add a Cold Drinks stand or Coffee Kiosk by the ${where(a)} path.` : `Build a Cold Drinks stand touching the ${where(a)} path. Drinks are cheap to run and sell all day.`,
     restroom: (a) => has('restroom') ? `Add Restrooms near the ${where(a)} path.` : `Build Restrooms touching the ${where(a)} path. Unhappy bladders mean unhappy guests.`,
-    dinos: (a) => `Guests on the ${where(a)} paths see no dinosaurs. Put an enclosure beside that path, or add animals.`,
+    dinos: (a) => (monoAdvice() || `Guests on the ${where(a)} paths see no dinosaurs. Put an enclosure beside that path, or add animals.`),
     scared: () => 'Recapture loose animals and use stronger fences.' };
   const label = { thirst: 'thirsty', food: 'hungry', restroom: 'need a restroom', dinos: 'want to see more dinosaurs', scared: 'are scared' };
   const top = Object.keys(tally).map(k => ({ k, pct: n ? Math.round(tally[k].length / n * 100) : 0, label: label[k], tip: tip[k](tally[k]) })).filter(o => o.pct > 0).sort((a, b) => b.pct - a.pct).slice(0, 3);
@@ -1078,11 +1138,14 @@ function spawnGuest(){
   guests.push(g); return g;
 }
 function nextTile(g){
+  if (g.state === 'queue') return null;
   const opts = []; const leaving = g.state === 'leave' || g.state === 'flee';
   for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const ii = g.ci + di, jj = g.cj + dj; if (!isPath(ii, jj)) continue; opts.push([ii, jj]); }
   if (!opts.length) return null;
+  if (leaving && exitDist[idx(g.ci, g.cj)] >= 1e6){ const here = idx(g.ci, g.cj), hv = homeVia.get(pcomp[here]); if (!hv) return null; // v10: out on the monorail
+    if (hv.spot === here){ startQueue(g, hv.from, hv.to, hv.line, true); return null; } g.dest = hv.spot; return stepToward(g); }
   if (leaving){ let best = null, bd = exitDist[idx(g.ci, g.cj)]; for (const [ii, jj] of opts){ const dd = exitDist[idx(ii, jj)]; if (dd < bd){ bd = dd; best = [ii, jj]; } } return best; }
-  if (g.state === 'walk'){ if (g.dest < 0 || g.dest === idx(g.ci, g.cj)) pickDest(g); if (g.dest >= 0){ const st = stepToward(g); if (st) return st; g.dest = -1; } }
+  if (g.state === 'walk'){ if (g.dest < 0 || g.dest === idx(g.ci, g.cj)) pickDest(g); if (g.goal === 'mono' && g.dest === idx(g.ci, g.cj)){ startQueue(g, g.mBid, g.mTo, g.mLine, false); return null; } if (g.dest >= 0){ const st = stepToward(g); if (st) return st; g.dest = -1; } }
   let tot = 0; const w = opts.map(([ii, jj]) => { const k = idx(ii, jj); let v = 1 + Math.min(viewMap[k], 200) * 0.03 + (g.visited.has(k) ? 0 : 2); if (ii === g.pi && jj === g.pj) v *= opts.length > 1 ? 0.08 : 1; if (jj === GATE.j && g.state === 'walk') v *= 0.05; tot += v; return v; });
   let r = rnd() * tot; for (let k = 0; k < opts.length; k++){ r -= w[k]; if (r <= 0) return opts[k]; } return opts[opts.length - 1];
 }
@@ -1097,7 +1160,9 @@ function guestBuy(g, t, want){ const S = t === 'visitor' ? (want === 'hun' ? { p
   G.stats.shopSales = (G.stats.shopSales || 0) + 1; return true; }
 function guestArrive(g){
   const k = idx(g.ci, g.cj); if (g.lastArr === k) return; g.lastArr = k; g.visited.add(k);
+  if (g.state === 'walk' && g.dest === k && g.goal === 'mono'){ g.dest = -1; startQueue(g, g.mBid, g.mTo, g.mLine, false); return; }
   if (g.state === 'walk' && g.dest === k){ g.dest = -1; if (g.goal === 'view'){ g.linger = fr(3, 7); if (g.goalPen >= 0 && !g.seen.has(g.goalPen)){ g.seen.add(g.goalPen); g.happy = Math.min(100, g.happy + 5); } } else if (g.goal !== 'explore') g.linger = fr(0.8, 1.6); else g.linger = fr(0, 1); }
+  if (g.state === 'walk') for (const s of penSpots) if (s.k === k && !g.seen.has(s.pen)){ g.seen.add(s.pen); g.happy = Math.min(100, g.happy + 5); g.goalPen = s.pen; g.linger = Math.max(g.linger, fr(3, 6)); } // passing an exhibit's best spot counts as seeing it
   if (g.state === 'walk'){ const s = shopsNear(g.ci, g.cj);
     if (g.hunger > 0.4){ for (const t of FOOD_T) if (s.has(t) && guestBuy(g, t, 'hun')) break; }
     if ((g.thirst || 0) > 0.4){ for (const t of DRINK_T) if (s.has(t) && guestBuy(g, t, 'thi')) break; }
@@ -1135,11 +1200,15 @@ function updateGuests(dt, hourDt){
         if ((g.state === 'leave' || g.state === 'flee') && g.cj === GATE.j && (g.ci === GATE.i || g.ci === GATE.i + 1)){ g.exiting = true; g.wp = [[fr(-1.3, 1.3), PIER.z0 + 1.5], [fr(-1.3, 1.3), DOCKH.z0 + 0.6], [fr(-13, 13), fr(DOCKH.z0 + 1.2, DOCKH.z1 - 1.4)]]; g.tx = g.wp[0][0]; g.tz = g.wp[0][1]; continue; }
         guestArrive(g);
         if (g.linger > 0 && g.state === 'walk'){ g.linger -= dt; g.moving = 0; if (g.goalPen >= 0){ const P = pens.get(g.goalPen); if (P){ const [cx, cz] = penCenter(P); g.hd = Math.atan2(cx - g.x, cz - g.z); } } }
-        else { const nt = nextTile(g); if (!nt){ if (g.state !== 'walk'){ g.stuck = (g.stuck || 0) + dt; if (g.stuck > 4){ removeGuest(g); onGuestLeft(g); } } g.tx = tX(g.ci) + fr(-1.5, 1.5); g.tz = tZ(g.cj) + fr(-1.5, 1.5); }
+        else { const nt = nextTile(g); if (!nt){ if (g.state !== 'queue'){ if (g.state !== 'walk'){ g.stuck = (g.stuck || 0) + dt; if (g.stuck > 4){ removeGuest(g); onGuestLeft(g); } } g.tx = tX(g.ci) + fr(-1.5, 1.5); g.tz = tZ(g.cj) + fr(-1.5, 1.5); } }
         else { g.pi = g.ci; g.pj = g.cj; g.ci = nt[0]; g.cj = nt[1]; const di = g.ci - g.pi, dj = g.cj - g.pj; g.tx = tX(g.ci) - dj * g.off; g.tz = tZ(g.cj) + di * g.off; } }
       } else { const s = Math.min(dd, sp * dt); g.x += dx / dd * s; g.z += dz / dd * s; g.hd = Math.atan2(dx, dz); }
       if (!(g.linger > 0 && g.state === 'walk') && !(g.exiting && !g.boarding && g.wp && !g.wp.length && Math.hypot(g.tx - g.x, g.tz - g.z) < 0.3)) g.moving = 1;
     }
+    else if (g.state === 'ride') continue; // inside a monorail car
+    else if (g.state === 'queue'){ const dx = g.tx - g.x, dz = g.tz - g.z, dd = Math.hypot(dx, dz); g.qT += dt; g.stay -= hourDt * 0.5;
+      if (dd > 0.2){ const s2 = Math.min(dd, g.speed * dt); g.x += dx / dd * s2; g.z += dz / dd * s2; g.hd = Math.atan2(dx, dz); g.moving = 1; } else { g.moving = 0; const b = buildings.get(g.qBid); if (b) g.hd = Math.atan2(b.x - g.x, b.z - g.z); }
+      const L = MONO.lines.find(l => l.def.id === g.qLine); if (!L || !L.ok){ if (g.homeward){ removeGuest(g); onGuestLeft(g); continue; } unqueue(g); } else if (!g.homeward && (g.qT > 150 || G.hour >= CLOSE)){ g.happy -= 4; unqueue(g); } }
     else if (g.state === 'lured'){ const dx = g.tx - g.x, dz = g.tz - g.z, dd = Math.hypot(dx, dz); if (dd < 0.4){ startToss(g); } else { const s = Math.min(dd, 3.4 * dt); g.x += dx / dd * s; g.z += dz / dd * s; g.hd = Math.atan2(dx, dz); } g.moving = 1.4; }
     else if (g.state === 'tossed'){ g.tt += dt / g.tDur; const k = Math.min(1, g.tt); g.x = lerp(g.ax, g.bx, k); g.z = lerp(g.az, g.bz, k); g.yOff = Math.sin(k * Math.PI) * g.arc; g.spin = k * 5; g.moving = 1.5;
       if (k >= 1){ g.state = 'inpen'; g.yOff = 0; g.spin = 0; if (walkH(g.x, g.z) > H(g.x, g.z) + 0.3) dust(g.x, g.z, 2.5, 8, 0xe8f0f0, walkH(g.x, g.z)); else dust(g.x, g.z, 1.5, 3); } }
@@ -1211,28 +1280,157 @@ function updateJeeps(dt){
     let tx, tz, vmax = j.contractor ? 12 : 16;
     if (j.state === 'return'){ [tx, tz] = j.home; } else if (targ){ tx = targ.x; tz = targ.z; }
     if (tx !== undefined){ const dx = tx - j.x, dz = tz - j.z, dd = Math.hypot(dx, dz); const th = Math.atan2(dx, dz); let dh = th - j.hd; while (dh > Math.PI) dh -= TAU; while (dh < -Math.PI) dh += TAU; j.hd += clamp(dh, -2 * dt, 2 * dt);
-      const stopAt = j.state === 'return' ? 1 : 17; const want = dd > stopAt ? vmax : 0; j.v = damp(j.v, want, 2, dt); j.x += Math.sin(j.hd) * j.v * dt; j.z += Math.cos(j.hd) * j.v * dt;
-      if (j.state === 'drive' && targ && dd < 24){ j.fire -= dt; if (j.fire <= 0){ j.fire = 1.1; fireDart(j, targ); } }
+      const stopAt = j.state === 'return' ? 1 : 17; const ahead = H(j.x + Math.sin(j.hd) * 4, j.z + Math.cos(j.hd) * 4); const want = dd > stopAt && (ahead > 0.35 || j.state === 'return') ? vmax : 0; /* v10: rangers stop at the shore and fire from there */ j.v = damp(j.v, want, 2, dt); j.x += Math.sin(j.hd) * j.v * dt; j.z += Math.cos(j.hd) * j.v * dt;
+      if (j.state === 'drive' && targ && dd < (SPECIES_DATA[targ.sp].mode === 'fly' || SPECIES_DATA[targ.sp].mode === 'swim' ? 34 : 24)){ j.fire -= dt; if (j.fire <= 0){ j.fire = 1.1; fireDart(j, targ); } }
       if (j.state === 'return' && dd < 2){ scene.remove(j.mesh); jeeps.splice(jeeps.indexOf(j), 1); showAlert(); continue; } }
     const y = H(j.x, j.z); j.mesh.position.set(j.x, y, j.z); j.mesh.rotation.set(0, j.hd, 0); if (j.v > 2 && rnd() < dt * 6) dust(j.x - Math.sin(j.hd) * 2, j.z - Math.cos(j.hd) * 2, 1.6, 1);
   }
-  for (const a of darts.slice()){ a.t += dt / 0.28; const k = Math.min(1, a.t); a.m.position.set(lerp(a.ax, a.d.x, k), lerp(a.ay, H(a.d.x, a.d.z) + SPECIES_DATA[a.d.sp].hipH, k), lerp(a.az, a.d.z, k)); a.m.lookAt(a.d.x, a.m.position.y, a.d.z);
+  for (const a of darts.slice()){ a.t += dt / 0.28; const k = Math.min(1, a.t); a.m.position.set(lerp(a.ax, a.d.x, k), lerp(a.ay, dartY(a.d), k), lerp(a.az, a.d.z, k)); a.m.lookAt(a.d.x, a.m.position.y, a.d.z);
     if (k >= 1){ scene.remove(a.m); darts.splice(darts.indexOf(a), 1); hitDart(a.d); } }
 }
+function dartY(d){ const SD = SPECIES_DATA[d.sp]; return dinoY(d) + (SD.mode === 'swim' ? 0.4 : SD.mode === 'fly' ? SD.hipH * 0.5 : SD.hipH); }
 function fireDart(j, d){ SFX.dart(); const m = dartMesh.clone(); m.visible = true; scene.add(m); darts.push({ m, d, t: 0, ax: j.x, ay: H(j.x, j.z) + 2.2, az: j.z }); }
 function hitDart(d){ if (d.state !== 'loose') return; d.darts++; const need = SPECIES[d.sp].darts; d.model.setAction('roar', 0.8);
   if (d.darts >= need){ d.state = 'sedated'; d.sedT = 0; d.v = 0; toast(`${d.name} is down. Airlifting back to the enclosure.`, 'good'); SFX.thud(0.9, 3); dust(d.x, d.z, 4, 8); showAlert(); } }
+
+/* ================= v10 monorail: the only way over the ridge into the expansion ================= */
+const MONO_DECK = 7.2, MONO_CLEAR = 6.5, MONO_COST_M = 160, MONO_FARE = 4, MONO_CAP = 36, MONO_DWELL = 3.5, MONO_VMAX = 26, MONO_ACC = 6, CAR_GAP = 7.4; // speeds in game seconds (10 s = one park hour)
+const monoMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.05 });
+const monoPrevMat = new THREE.MeshStandardMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.6, depthWrite: false, roughness: 0.6, emissive: 0x1a4a6a });
+const trainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.3 });
+const TRAIN_GEO = { nose: M.trainCarGeo(true), mid: M.trainCarGeo(false) };
+const MONO = { lines: [] }; // runtime lines: { def, path, mesh, ok, train }
+const pcomp = new Int32Array(GN * GN).fill(-1); let mainComp = -1; const compReach = new Set(); const homeVia = new Map();
+let monoPrev = null;
+function monoDefs(){ if (!G.mono) G.mono = { lines: [] }; return G.mono.lines; }
+function stationAtTile(i, j){ if (!inGrid(i, j)) return null; const k = idx(i, j); if (tileType[k] !== T_BUILD) return null; const b = buildings.get(tileRef[k]); return b && b.type === 'station' ? b : null; }
+function stationSpots(b){ const out = []; for (let dj = -1; dj <= b.h; dj++) for (let di = -1; di <= b.w; di++){ if ((di === -1 || di === b.w) === (dj === -1 || dj === b.h)) continue; if (isPath(b.i + di, b.j + dj)) out.push(idx(b.i + di, b.j + dj)); } return out; }
+/* path components: guests can only walk inside one; monorail lines join them */
+function computeComps(){ pcomp.fill(-1); let c = 0; const q = [];
+  for (let k = 0; k < pcomp.length; k++){ if (tileType[k] !== T_PATH || pcomp[k] >= 0) continue; pcomp[k] = c; q.length = 0; q.push(k);
+    for (let h = 0; h < q.length; h++){ const cur = q[h], i = kI(cur), j = kJ(cur); for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const ii = i + di, jj = j + dj; if (!isPath(ii, jj)) continue; const kk = idx(ii, jj); if (pcomp[kk] < 0){ pcomp[kk] = c; q.push(kk); } } } c++; }
+  mainComp = pcomp[idx(GATE.i, GATE.j)]; }
+function monoRefresh(){ computeComps(); compReach.clear(); homeVia.clear(); if (mainComp >= 0) compReach.add(mainComp);
+  for (const b of buildings.values()) if (b.type === 'station'){ b.spots = stationSpots(b); b.comp = b.spots.length ? pcomp[b.spots.find(k => pcomp[k] === mainComp) ?? b.spots[0]] : -1; b.spot = b.spots.find(k => pcomp[k] === b.comp) ?? -1; }
+  for (const L of MONO.lines){ const sts = L.def.st.map(id => buildings.get(id)).filter(b => b && b.comp >= 0); L.sts = [...new Set(sts)]; L.ok = L.sts.length >= 2; }
+  let grew = true; while (grew){ grew = false; for (const L of MONO.lines){ if (!L.ok) continue; const from = L.sts.find(b => compReach.has(b.comp)); if (!from) continue;
+    for (const b of L.sts) if (!compReach.has(b.comp)){ compReach.add(b.comp); homeVia.set(b.comp, { line: L.def.id, from: b.id, to: from.id, spot: b.spot }); grew = true; } } } }
+const reachK = k => pcomp[k] >= 0 && compReach.has(pcomp[k]);
+function monoOperational(){ return MONO.lines.some(L => L.ok); }
+function expansionExhibits(){ return [...pens.values()].filter(p => { const k = idx((p.i0 + p.i1) >> 1, (p.j0 + p.j1) >> 1); return (isExpK(k) || ridgeMask[k]) && dinos.some(d => d.pen === p.id); }); } /* ridgeMask: enclosures an older save built where the ridge now stands */
+function expansionCut(){ return expansionExhibits().filter(p => !penSpots.some(s => s.pen === p.id)); }
+/* track geometry: a smooth curve through the tapped points, held ~7 m above the ground and level with each station deck */
+function monoPath(def){
+  let nodes = def.nodes.map(n => n.slice()); const st = def.st.slice();
+  if (!def.loop && nodes.length >= 2){ const ext = (a, b) => { const dx = a[0] - b[0], dz = a[1] - b[1], l = Math.hypot(dx, dz) || 1; return [a[0] + dx / l * 13, a[1] + dz / l * 13]; };
+    nodes = [ext(nodes[0], nodes[1]), ...nodes, ext(nodes[nodes.length - 1], nodes[nodes.length - 2])]; st.unshift(0); st.push(0); } // buffer stubs so the whole train fits at an end station
+  const curve = new THREE.CatmullRomCurve3(nodes.map(n => new THREE.Vector3(n[0], 0, n[1])), !!def.loop, 'centripetal', 0.5);
+  const len = curve.getLength(), N = Math.max(4, Math.ceil(len / 2)), pts = curve.getSpacedPoints(N);
+  const gr = pts.map(p => Math.max(H(p.x, p.z), H(p.x + 1.6, p.z), H(p.x - 1.6, p.z), H(p.x, p.z + 1.6), H(p.x, p.z - 1.6), -1));
+  const wrap = i => def.loop ? (i % N + N) % N : clamp(i, 0, N);
+  let ys = gr.map(g => g + MONO_CLEAR); { const m = ys.map((_, i) => { let v = -1e9; for (let o = -5; o <= 5; o++) v = Math.max(v, ys[wrap(i + o)]); return v; }); ys = m; }
+  for (let pass = 0; pass < 3; pass++){ ys = ys.map((_, i) => { let s = 0; for (let o = -4; o <= 4; o++) s += ys[wrap(i + o)]; return s / 9; }); }
+  for (let i = 0; i <= N; i++) ys[i] = Math.max(ys[i], gr[i] + 4.2);
+  const stops = [];
+  nodes.forEach((n, k) => { if (!st[k]) return; const b = buildings.get(st[k]); if (!b || stops.some(s => s.bid === b.id)) return; let bi = 0, bd = 1e9;
+    for (let i = 0; i <= N; i++){ const d = (pts[i].x - n[0]) ** 2 + (pts[i].z - n[1]) ** 2; if (d < bd){ bd = d; bi = i; } } stops.push({ bid: b.id, i: bi, s: bi / N * len, y: b.mesh.position.y + 0.05 + MONO_DECK }); });
+  for (const sp of stops) for (let i = 0; i <= N; i++){ let di = Math.abs(i - sp.i); if (def.loop) di = Math.min(di, N - di); const ds = di * len / N; if (ds < 24) ys[i] = lerp(sp.y, ys[i], sstep(5, 24, ds)); }
+  if (def.loop) ys[N] = ys[0];
+  stops.sort((a, b) => a.s - b.s); return { pts, ys, gr, len, N, loop: !!def.loop, stops }; }
+function monoAt(P, s, out){ if (P.loop) s = ((s % P.len) + P.len) % P.len; else s = clamp(s, 0, P.len); const f = s / P.len * P.N, i = Math.min(P.N - 1, Math.floor(f)), t = f - i, a = P.pts[i], b = P.pts[i + 1];
+  out.set(lerp(a.x, b.x, t), lerp(P.ys[i], P.ys[i + 1], t), lerp(a.z, b.z, t)); return out; }
+function monoTrackGeo(P){ const parts = []; const e = new THREE.Euler(0, 0, 0, 'YXZ'), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(1, 1, 1);
+  const beam = new THREE.BoxGeometry(1, 1, 1), cap = new THREE.BoxGeometry(0.62, 0.1, 1), pil = new THREE.CylinderGeometry(0.42, 0.62, 1, 10), head = new THREE.BoxGeometry(1.7, 0.6, 1.3);
+  const nearStop = i => P.stops.some(sp => { let di = Math.abs(i - sp.i); if (P.loop) di = Math.min(di, P.N - di); return di * P.len / P.N < 5.5; });
+  for (let i = 0; i < P.N; i++){ const a = P.pts[i], b = P.pts[i + 1], ya = P.ys[i], yb = P.ys[i + 1]; const dx = b.x - a.x, dz = b.z - a.z, dy = yb - ya, hl = Math.hypot(dx, dz), L = Math.hypot(hl, dy) + 0.06;
+    e.set(-Math.atan2(dy, hl), Math.atan2(dx, dz), 0); q.setFromEuler(e);
+    v.set((a.x + b.x) / 2, (ya + yb) / 2 - 0.5, (a.z + b.z) / 2); parts.push([beam, 0xbdb8ac, new THREE.Matrix4().compose(v, q, sc.set(1.0, 1.0, L))]);
+    v.y += 0.55; parts.push([cap, 0x5a6266, new THREE.Matrix4().compose(v.clone(), q, sc.set(1, 1, L))]); }
+  const every = 5; for (let i = (P.loop ? 0 : 6); i <= P.N - (P.loop ? 1 : 6); i += every){ if (nearStop(i)) continue; const p = P.pts[i], top = P.ys[i] - 1.0, g = H(p.x, p.z) - 0.6, hgt = top - g; if (hgt < 0.8) continue;
+    parts.push([pil, 0xb0aba0, new THREE.Matrix4().compose(v.set(p.x, g + hgt / 2, p.z), q.identity(), sc.set(1, hgt, 1))]);
+    const t = P.pts[Math.min(P.N, i + 1)], o = P.pts[Math.max(0, i - 1)]; e.set(0, Math.atan2(t.x - o.x, t.z - o.z), 0); q.setFromEuler(e); parts.push([head, 0xa8a398, new THREE.Matrix4().compose(v.set(p.x, top - 0.1, p.z), q, sc.set(1, 1, 1))]); }
+  if (!P.loop) for (const i of [0, P.N]){ const p = P.pts[i]; parts.push([new THREE.BoxGeometry(1.6, 1.4, 0.8), 0xc8a030, new THREE.Matrix4().compose(v.set(p.x, P.ys[i] + 0.4, p.z), q.identity(), sc.set(1, 1, 1))]); }
+  return M.mergeColored(parts); }
+function monoBuildLine(def){ const P = monoPath(def); const mesh = new THREE.Mesh(monoTrackGeo(P), monoMat); mesh.castShadow = true; mesh.receiveShadow = true; scene.add(mesh);
+  const cars = [TRAIN_GEO.nose, TRAIN_GEO.mid, TRAIN_GEO.nose].map((g, k) => { const m = new THREE.Mesh(g, trainMat); m.castShadow = true; if (k === 2) m.userData.back = true; scene.add(m); return m; });
+  const L = { def, path: P, mesh, ok: false, sts: [], train: { cars, s: P.stops.length ? P.stops[0].s : P.len / 2, dir: 1, v: 0, dwell: 2, k: 0, riders: [] } };
+  for (const sp of P.stops){ const b = buildings.get(sp.bid); if (!b) continue; const a = P.pts[Math.max(0, sp.i - 2)], c = P.pts[Math.min(P.N, sp.i + 2)]; b.rot = Math.atan2(c.x - a.x, c.z - a.z); b.mesh.rotation.y = b.rot; }
+  MONO.lines.push(L); placeTrain(L); return L; }
+function monoClearRuntime(){ for (const L of MONO.lines){ scene.remove(L.mesh); L.mesh.geometry.dispose(); for (const c of L.train.cars) scene.remove(c); } MONO.lines.length = 0; }
+function monoRebuildAll(){ monoClearRuntime(); for (const d of monoDefs()) monoBuildLine(d); }
+function monoRemoveLine(id, refundPct = 0){ const defs = monoDefs(); const n = defs.findIndex(d => d.id === id); if (n < 0) return 0; const def = defs[n]; defs.splice(n, 1);
+  const L = MONO.lines.find(l => l.def === def); if (L){ scene.remove(L.mesh); L.mesh.geometry.dispose(); for (const c of L.train.cars) scene.remove(c); MONO.lines.splice(MONO.lines.indexOf(L), 1);
+    for (const g of L.train.riders) if (!g.gone){ removeGuest(g); onGuestLeft(g); } }
+  for (const g of guests) if (!g.gone && g.state === 'queue' && g.qLine === id) unqueue(g);
+  const c = Math.round((def.cost || 0) * refundPct); if (c) refund(c); return c; }
+function monoStationGone(b){ for (const d of monoDefs().slice()) if (d.st.includes(b.id)){ const c = monoRemoveLine(d.id, 0.5); toast(`Monorail line removed with the station${c ? ` (${fmt(c)} refunded for the track)` : ''}.`, ''); } }
+const _tp = new THREE.Vector3(), _tq = new THREE.Vector3();
+function placeTrain(L){ const T = L.train, P = L.path;
+  T.cars.forEach((m, k) => { const s = T.s + (1 - k) * CAR_GAP * T.dir; monoAt(P, s + 2.5, _tp); monoAt(P, s - 2.5, _tq); m.position.set((_tp.x + _tq.x) / 2, (_tp.y + _tq.y) / 2, (_tp.z + _tq.z) / 2);
+    const yaw = Math.atan2(_tp.x - _tq.x, _tp.z - _tq.z) + (T.dir < 0 ? Math.PI : 0) + (m.userData.back ? Math.PI : 0); m.rotation.set(0, yaw, 0, 'YXZ'); m.rotation.x = Math.atan2(_tp.y - _tq.y, 5) * (T.dir < 0 !== !!m.userData.back ? 1 : -1); }); }
+function updateMono(dt){
+  for (const L of MONO.lines){ const T = L.train, P = L.path, S = P.stops; if (S.length < 1){ placeTrain(L); continue; }
+    if (T.dwell > 0){ T.dwell -= dt; if (T.dwell <= 0){ if (S.length < 2){ T.dwell = MONO_DWELL; continue; }
+        if (P.loop) T.k = (T.k + 1) % S.length; else { if (T.k + T.dir < 0 || T.k + T.dir >= S.length) T.dir = -T.dir; T.k += T.dir; } } }
+    else { const sT = S[T.k].s; const dist = P.loop ? ((sT - T.s) % P.len + P.len) % P.len : Math.abs(sT - T.s);
+      const vt = Math.min(MONO_VMAX, Math.sqrt(2 * MONO_ACC * dist) + 0.3); T.v = Math.min(vt, T.v + MONO_ACC * dt); const step = Math.min(dist, T.v * dt);
+      T.s += (P.loop ? 1 : Math.sign(sT - T.s) || 1) * step; if (P.loop) T.s %= P.len; if (!P.loop) T.dir = sT >= T.s ? (T.dir) : T.dir;
+      if (dist - step < 0.02){ T.s = sT; T.v = 0; T.dwell = MONO_DWELL; monoArrive(L, S[T.k]); } }
+    placeTrain(L); T.ds = (T.ds || 0) + T.v * dt;
+    const mc = T.cars[1].position; for (const g of T.riders){ g.x = mc.x; g.z = mc.z; } } }
+function monoArrive(L, sp){ const b = buildings.get(sp.bid); if (!b) return; const T = L.train;
+  for (const g of T.riders){ if (g.gone || g.toBid !== b.id) continue; // get off
+    const k = b.spot; if (k < 0){ removeGuest(g); onGuestLeft(g); continue; }
+    g.state = g.homeward ? 'leave' : 'walk'; g.ci = kI(k); g.cj = kJ(k); g.pi = g.pj = -1; g.x = b.x + fr(-1.5, 1.5); g.z = b.z + fr(-1.5, 1.5); g.tx = tX(g.ci) + fr(-1, 1); g.tz = tZ(g.cj) + fr(-1, 1);
+    g.dest = -1; g.goal = ''; g.lastArr = -1; g.stuck = 0; g.happy = Math.min(100, g.happy + 4); g.linger = 0; g.moving = 1; }
+  T.riders = T.riders.filter(g => g.state === 'ride' && !g.gone);
+  for (const g of guests){ if (T.riders.length >= MONO_CAP) break; if (g.gone || g.state !== 'queue' || g.qBid !== b.id || g.qLine !== L.def.id) continue;
+    g.state = 'ride'; T.riders.push(g); G.stats.monoRides = (G.stats.monoRides || 0) + 1; if (g.money >= MONO_FARE){ g.money -= MONO_FARE; earn('tickets', MONO_FARE); G.stats.monoFares = (G.stats.monoFares || 0) + MONO_FARE; } } }
+function startQueue(g, bid, toBid, line, homeward){ const b = buildings.get(bid); if (!b) return false; g.state = 'queue'; g.qBid = bid; g.toBid = toBid; g.qLine = line; g.homeward = !!homeward; g.qT = 0; g.dest = -1;
+  const a = fr(0, TAU), r = fr(0.6, 2.4); g.tx = tX(g.ci) + Math.cos(a) * r * 0.6; g.tz = tZ(g.cj) + Math.sin(a) * r * 0.6; return true; }
+function unqueue(g){ g.state = g.homeward ? 'leave' : 'walk'; g.dest = -1; g.goal = ''; g.lastArr = -1; }
+/* guests choosing a ride: from a station in their own path network to another network that has something to see */
+function monoOptions(g, here){ const out = []; const myc = pcomp[here]; if (myc < 0) return out;
+  for (const L of MONO.lines){ if (!L.ok) continue; const mine = L.sts.find(b => b.comp === myc); if (!mine) continue;
+    for (const b2 of L.sts){ if (b2.comp === myc || !compReach.has(b2.comp)) continue; let w = 5;
+      for (const s of penSpots) if (pcomp[s.k] === b2.comp) w += (8 + s.ap) * (g.seen.has(s.pen) ? 0.12 : 1.5);
+      out.push({ k: mine.spot, goal: 'mono', bid: mine.id, to: b2.id, line: L.def.id, w: w * 0.9 }); } }
+  return out; }
+/* ---- monorail track tool ---- */
+function monoToolLen(){ const N = tool.nodes; let l = 0; for (let k = 1; k < N.length; k++) l += Math.hypot(N[k][0] - N[k - 1][0], N[k][1] - N[k - 1][1]); return l; }
+function monoToolCost(){ return Math.round(monoToolLen() * MONO_COST_M / 100) * 100; }
+function monoToolDue(){ const c = monoToolCost(); return Math.max(0, c - (G.monoCredit || 0)); }
+function monoToolReady(){ const st = tool.st.filter(Boolean); return tool.nodes.length >= 2 && !!tool.st[tool.st.length - 1] && new Set(st).size >= 2; }
+function monoTap(t){ const N = tool.nodes; const b = stationAtTile(t[0], t[1]);
+  if (!N.length){ if (!b){ toast('Start the track at a Monorail Station. Build one first (Build > Paths).', 'bad'); return; } N.push([b.x, b.z]); tool.st.push(b.id); SFX.click(); drawMonoPreview(); renderToolbar(); return; }
+  if (tool.loop){ toast('The loop is closed. Press Done, or Undo.', ''); return; }
+  const p = b ? [b.x, b.z] : [tX(t[0]), tZ(t[1])], last = N[N.length - 1], l = Math.hypot(p[0] - last[0], p[1] - last[1]); if (l < 6) return;
+  if (l > 170){ toast('Track segment too long. Tap a closer point.', 'bad'); return; }
+  if (b && tool.st.includes(b.id) && !(b.id === tool.st[0] && N.length >= 3)){ toast('The track already stops at that station.', 'bad'); return; }
+  if (N.length >= 2){ const a = N[N.length - 2]; const ux = last[0] - a[0], uz = last[1] - a[1], vx = p[0] - last[0], vz = p[1] - last[1]; const cos = (ux * vx + uz * vz) / (Math.hypot(ux, uz) * Math.hypot(vx, vz) || 1); if (cos < -0.45){ toast('Turn too sharp for a monorail. Add a point to round the corner.', 'bad'); return; } }
+  if (b && b.id === tool.st[0]){ tool.loop = true; } else { N.push(p); tool.st.push(b ? b.id : 0); }
+  SFX.click(); drawMonoPreview(); renderToolbar(); }
+function toolDef(){ return { nodes: tool.nodes, st: tool.st, loop: !!tool.loop }; }
+function drawMonoPreview(){ clearPending(); if (!tool || tool.kind !== 'mono') return;
+  if (tool.nodes.length >= 2){ const P = monoPath(toolDef()); if (!monoPrev){ monoPrev = new THREE.Mesh(new THREE.BufferGeometry(), monoPrevMat); monoPrev.renderOrder = 6; scene.add(monoPrev); } monoPrev.geometry.dispose(); monoPrev.geometry = monoTrackGeo(P); monoPrev.visible = true; }
+  tool.nodes.forEach((n, k) => { const m = new THREE.Mesh(nodeGeo, k === tool.nodes.length - 1 ? nodeMatLast : nodeMat); m.scale.setScalar(tool.st[k] ? 2.2 : 1.3); m.position.set(n[0], H(n[0], n[1]) + 0.5, n[1]); m.renderOrder = 7; scene.add(m); nodeMeshes.push(m); }); }
+function commitMono(){ if (!monoToolReady()){ toast(tool.nodes.length < 2 ? 'Tap points across the ridge, ending at another station.' : 'End the track at a Monorail Station.', 'bad'); return; }
+  const cost = monoToolCost(), due = monoToolDue(); if (G.money < due){ toast('Not enough funds.', 'bad'); return; }
+  const used = cost - due; if (used) G.monoCredit = Math.max(0, (G.monoCredit || 0) - used); spend('build', due);
+  const def = { id: G.nextId++, nodes: tool.nodes.map(n => [+n[0].toFixed(2), +n[1].toFixed(2)]), st: tool.st.slice(), loop: !!tool.loop, cost }; monoDefs().push(def); monoBuildLine(def);
+  afterStructureChange(); SFX.build(); cancelTool(); recordUndo({ kind: 'mono', id: def.id, cost: due, label: 'Monorail line' });
+  const L = MONO.lines.find(l => l.def === def); setTimeout(() => toast(L && L.ok ? `Monorail open: ${L.sts.length} stations, ${Math.round(L.path.len)} m of track. Guests ride for ${fmt(MONO_FARE)}.` : 'Track built. Each station must touch a path that guests can reach before trains carry anyone.', L && L.ok ? 'good' : 'bad'), 300); }
 
 /* ================= economy ================= */
 function earn(cat, amt){ G.money += amt; G.ledger[cat] = (G.ledger[cat] || 0) + amt; flowAdd(cat === 'other' ? 'none' : cat, amt); }
 function spend(cat, amt){ G.money -= amt; G.ledger[cat] = (G.ledger[cat] || 0) + amt; flowAdd(cat, amt); }
 const INCOME = ['tickets', 'shops'];
 function ledgerProfit(L){ let p = 0; for (const k in L) p += INCOME.includes(k) ? L[k] : -L[k]; return p; }
-function appealTotal(){ const seen = {}; let a = 0; for (const d of dinos){ if (d.state === 'holding' || d.state === 'wild' || d.state === 'carcass' || d.state === 'escaping') continue; seen[d.sp] = (seen[d.sp] || 0) + 1; a += SPECIES[d.sp].appeal * Math.pow(0.75, seen[d.sp] - 1); } return a; }
+function appealTotal(){ const seen = {}; let a = MONO.lines.filter(L => L.ok).reduce((s, L, n) => s + (n ? 10 : 30), 0); /* v10: the monorail is a ride in its own right */ for (const d of dinos){ if (d.state === 'holding' || d.state === 'wild' || d.state === 'carcass' || d.state === 'escaping') continue; seen[d.sp] = (seen[d.sp] || 0) + 1; a += SPECIES[d.sp].appeal * Math.pow(0.75, seen[d.sp] - 1); } return a; }
 const DINO_UPKEEP = 400;
 // a hatchery with no egg in it only needs a caretaker; the full bill applies while it incubates
 function bldUpkeep(b){ const B = BUILD[b.type]; if (b.type === 'hatchery'){ const hs = hatcheries(), k = hs.indexOf(b); return k >= 0 && eggs.length > k * 2 ? B.upkeep : B.idleUpkeep; } return B.upkeep || 0; }
-function dailyUpkeep(){ let u = 0; for (const b of buildings.values()) u += bldUpkeep(b); for (const pen of pens.values()) u += pen.segs.length * FT[pen.tier].upkeep; u += dinos.filter(d => d.state !== 'wild' && d.state !== 'carcass').length * DINO_UPKEEP; return u; }
+function dailyUpkeep(){ let u = 0; for (const b of buildings.values()) u += bldUpkeep(b); for (const pen of pens.values()) u += pen.segs.length * FT[pen.tier].upkeep; u += dinos.filter(d => d.state !== 'wild' && d.state !== 'carcass').length * DINO_UPKEEP; u += MONO.lines.length * 500; return u; }
 function unseenGuest(){ G.stats.guestsTotal++; G.stats.guestsToday++; const money = fr(60, 220); if (money < G.price) return; earn('tickets', G.price);
   const shops = new Set([...buildings.values()].map(b => b.type)); const ft = FOOD_T.find(t => shops.has(t)), dt2 = DRINK_T.find(t => shops.has(t));
   if (ft && rnd() < 0.6) earn('shops', ft === 'visitor' ? FOOD_PRICE : SHOP[ft].p); if (dt2 && rnd() < 0.55) earn('shops', dt2 === 'visitor' ? DRINK_PRICE : SHOP[dt2].p); if (shops.has('gift') && rnd() < 0.2) earn('shops', GIFT_PRICE);
@@ -1281,6 +1479,7 @@ function hatchEgg(e){
   refreshSheet();
 }
 function hourTick(){
+  monoAdvisorTick();
   flowHour(); spend('upkeep', dailyUpkeep() / (DAY_END - DAY_START));
   const rangerSt = [...buildings.values()].filter(b => b.type === 'ranger');
   for (const pen of pens.values()){ const [cx, cz] = penCenter(pen); const near = rangerSt.some(b => Math.hypot(b.x - cx, b.z - cz) < 60);
@@ -1374,7 +1573,7 @@ function showAlert(){
 $('alert').onclick = (e) => { const b = e.target.closest('[data-act]'); if (!b) return; SFX.click(); if (b.dataset.act === 'dispatch') dispatchRangers(); if (b.dataset.act === 'locate'){ const d = looseDinos()[0]; if (d){ focusOn(d.x, d.z, 60); cam.follow = d; } } showAlert(); };
 function closeSheet(){ sel = null; $('sheet').classList.add('hidden'); updateDockState(); cam.follow = null; }
 function openSheet(kind, ref){ sel = { kind, ref }; renderSheet(); $('sheet').classList.remove('hidden'); $('sheet').querySelector('.bd') && ($('sheet').querySelector('.bd').scrollTop = 0); updateDockState(); }
-function refreshSheet(){ if (sel && !sheetHeld) { const bd = $('sheet').querySelector('.bd'); const st = bd ? bd.scrollTop : 0; renderSheet(); const bd2 = $('sheet').querySelector('.bd'); if (bd2) bd2.scrollTop = st; } }
+function refreshSheet(){ if (sel && sel.renaming) return; if (sel && !sheetHeld) { const bd = $('sheet').querySelector('.bd'); const st = bd ? bd.scrollTop : 0; renderSheet(); const bd2 = $('sheet').querySelector('.bd'); if (bd2) bd2.scrollTop = st; } }
 const meter = (v, inv) => { const cls = inv ? (v > 0.66 ? 'bad' : v > 0.4 ? 'warn' : '') : (v < 0.34 ? 'bad' : v < 0.6 ? 'warn' : ''); return `<span class="meter ${cls}"><u style="width:${clamp(v, 0, 1) * 100}%"></u></span>`; };
 function header(title, icon){ return `<div class="hd">${icon ? ic(icon) : ''}<h2>${title}</h2><button class="hb" data-act="close" aria-label="Close">${ic('close')}</button></div>`; }
 function renderSheet(){
@@ -1391,6 +1590,8 @@ function renderSheet(){
         h += `<button class="card ${lock ? 'lock' : ''}" data-fence="${t}">${lock ? `<span class="tag">${FENCE_STARS[t]} STARS</span>` : ''}<span class="nm"><span class="swatch" style="background:${f.color}"></span>${f.name}</span><span class="ds">${f.desc}</span><span class="ds">Holds: ${holds.length ? holds.join(', ') : 'nothing dangerous'}</span><span class="pr">${fmt(f.cost * (pk === 'lagoon' ? 1.3 : 1))} <small style="font-size:11px;color:var(--bone2)">per tile edge${pk === 'aviary' ? ' + dome' : pk === 'lake' ? ' + digging' : ''}</small></span></button>`; });
       h += `</div>`; }
     else if (tab === 'paths'){ h += `<div class="cards"><button class="card" data-tool="path"><span class="nm">${ic('path')}Footpath</span><span class="ds">Tap point to point to lay gravel paths, then Done. Guests only walk on paths connected to the gate.</span><span class="pr">${fmt(BUILD.path.cost)} / tile</span></button>
+      <button class="card ${G.expand ? '' : 'lock'}" data-bld="station"><span class="nm">${ic('build')}Monorail Station</span><span class="ds">${BUILD.station.desc}</span><span class="pr">${fmt(BUILD.station.cost)} <small style="font-size:11px;color:var(--bone2)">+ grading on rough ground</small></span>${G.expand ? '' : '<span class="tag">PERMIT</span>'}</button>
+      <button class="card ${G.expand ? '' : 'lock'}" data-tool="mono"><span class="nm">${ic('path')}Monorail Track</span><span class="ds">Start at a station, tap points over the ridge, end at another station, then Done. Pillars follow the ground.${G.monoCredit ? ` <b>Free starter line: ${fmt(G.monoCredit)} of track credit.</b>` : ''}</span><span class="pr">${fmt(MONO_COST_M)} / m</span>${G.expand ? '' : '<span class="tag">PERMIT</span>'}</button>
       <button class="card" data-tool="bulldoze"><span class="nm">${ic('bulldoze')}Bulldoze</span><span class="ds">Tap a path tile, building or feeder to remove it. Half refund.</span><span class="pr">Refunds 50%</span></button></div>`; }
     else { const list = tab === 'care' ? ['hatchery', 'water', 'plant', 'browse', 'meat', 'goat', 'fish', 'insect', 'ranger'] : ['hatchery', 'food', 'pizza', 'restaurant', 'drinks', 'coffee', 'icecream', 'restroom', 'gift', 'viewing', 'stand', 'ranger'];
       h += `<div class="cards">` + list.map(t => { const B = BUILD[t]; const lock = G.stars < B.stars && !G.unlockAll; return `<button class="card ${lock ? 'lock' : ''}" data-bld="${t}">${lock ? `<span class="tag">${B.stars} STARS</span>` : ''}<span class="nm">${ic(t)}${B.name}</span><span class="ds">${B.desc}</span><span class="pr">${fmt(B.cost)}${B.upkeep ? ` <small style="font-size:11px;color:var(--bone2)">+${fmtK(B.upkeep)}/day</small>` : ''}</span></button>`; }).join('') + `</div>`; }
@@ -1412,7 +1613,7 @@ function renderSheet(){
       <div class="row"><span class="k">Space used</span><span class="v">${need} / ${penArea(pen)} tiles</span></div>
       <div class="row"><span class="k">Feeders</span><span class="v">${pen.feeders.length ? pen.feeders.map(f => BUILD[f.type].name).join(', ') : 'None'}</span></div>`;
     ds.splice(0, ds.length, ...ds.filter(d => d.state !== 'carcass'));
-    if (ds.length){ h += `<div class="list" style="margin-top:8px">` + ds.map(d => `<button class="li" data-dino="${d.id}">${ic('dino')}<span class="t"><b>${d.name}</b><span>${SPECIES[d.sp].name} - ${dinoStatus(d)}</span></span>${meter(1 - d.hunger)}</button>`).join('') + `</div>`; }
+    if (ds.length){ h += `<div class="list" style="margin-top:8px">` + ds.map(d => `<button class="li" data-dino="${d.id}">${ic('dino')}<span class="t"><b>${escH(d.name)}</b><span>${SPECIES[d.sp].name} - ${dinoStatus(d)}</span></span>${meter(1 - d.hunger)}</button>`).join('') + `</div>`; }
     else h += `<div class="note">Empty. Add a dinosaur from the Hatchery and a feeder that matches its diet.</div>`;
     h += `<div class="btns"><button class="btn pri" data-act="adddino">${ic('egg')}Add dinosaur</button><button class="btn" data-act="feeder">${ic('plant')}Add feeder</button></div><div class="btns"><button class="btn" data-act="feeders">${ic('meat')}Other food and water</button></div><div class="btns">`;
     if (pen.tier < FT.length - 1){ const t2 = pen.tier + 1, cost = pen.segs.length * Math.round(FT[t2].cost - FT[pen.tier].cost * 0.3); h += `<button class="btn" data-act="upgrade" ${G.stars < FENCE_STARS[t2] && !G.unlockAll ? 'disabled' : ''}>${ic('up')}${FT[t2].name} <small>${fmtK(cost)}</small></button>`; }
@@ -1423,7 +1624,7 @@ function renderSheet(){
   }
   else if (k === 'dino'){
     const d = sel.ref; if (!dinos.includes(d)){ closeSheet(); return; } const S = SPECIES[d.sp], c = dinoComfort(d), pen = pens.get(d.pen);
-    h += header(`${d.name}`, 'dino') + `<div class="bd"><div class="ds" style="margin:-4px 0 6px;color:var(--bone2);font-size:13px">${S.name} - ${S.diet === 'meat' ? 'Carnivore' : 'Herbivore'} - ${dinoStatus(d)}</div>
+    h += header(escH(d.name), 'dino') + `<div class="bd">${sel.renaming ? `<div class="rename"><input id="dinoName" type="text" maxlength="${NAME_MAX}" value="${escH(d.name)}" placeholder="New name" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-label="Dinosaur name"><button class="btn pri" data-act="renameok">Save</button><button class="btn" data-act="renamecancel">Cancel</button></div><div class="ds" style="font-size:11px;color:var(--bone2);margin:-2px 0 8px">Up to ${NAME_MAX} letters, numbers or spaces.</div>` : ''}<div class="ds" style="margin:-4px 0 6px;color:var(--bone2);font-size:13px">${S.name} - ${S.diet === 'meat' ? 'Carnivore' : 'Herbivore'} - ${dinoStatus(d)}</div>
       <div class="row"><span class="k">Fed</span>${meter(1 - d.hunger)}</div>${needsWater(d.sp) ? `<div class="row"><span class="k">Water</span>${meter(1 - clamp(d.thirst || 0, 0, 1))}</div>` : ''}<div class="row"><span class="k">Space</span>${meter(c.space)}</div><div class="row"><span class="k">Social group</span>${meter(c.social)}</div>
       <div class="row"><span class="k">Stress</span>${meter(d.stress, true)}</div><div class="row"><span class="k">Fence needed</span><span class="v">${FT[tierNeeded(S.str)].name}</span></div><div class="row"><span class="k">Appeal</span><span class="v">${S.appeal}</span></div>`;
     if (!feederOf(pen || { feeders: [] }, d.sp)) h += `<div class="note warn">No suitable feeder in this enclosure. ${S.short} eats: ${FOODS[d.sp].map(t => BUILD[t].name).join(', ')}.</div>`;
@@ -1438,7 +1639,7 @@ function renderSheet(){
       h += `<div class="lbl" style="margin:12px 0 4px">Colours</div><div class="chips">${SCHEMES.map(x => `<button class="chip ${x.id === cur ? 'on' : ''}" data-scheme="${x.id}"><span class="sw" style="background:${x.top !== undefined ? '#' + x.top.toString(16).padStart(6, '0') : 'linear-gradient(135deg,#6a7a4a,#c8b888)'}"></span>${x.name}${x.bold ? '*' : ''}</button>`).join('')}</div>
         <div class="chips" style="margin-top:6px">${PATTERNS.map(x => `<button class="chip ${x.id === pt ? 'on' : ''}" data-pattern="${x.id}">${x.name}</button>`).join('')}</div>
         <div class="btns"><button class="btn" data-act="schemeall">Use on every ${S.short}</button></div>`; }
-    h += `<div class="btns"><button class="btn" data-act="follow">${ic('follow')}${cam.follow === d ? 'Stop following' : 'Follow'}</button>${pen ? `<button class="btn" data-act="openpen">${ic('fence')}${pen.name}</button>` : ''}</div>`;
+    h += `<div class="btns"><button class="btn" data-act="rename">Rename</button><button class="btn" data-act="follow">${ic('follow')}${cam.follow === d ? 'Stop following' : 'Follow'}</button>${pen ? `<button class="btn" data-act="openpen">${ic('fence')}${pen.name}</button>` : ''}</div>`;
     if (S.diet === 'meat' && pen && d.state === 'pen') h += `<div class="btns"><button class="btn dng" data-act="feedd" ${G.feedCooldown > 0 ? 'disabled' : ''}>${ic('skull')}Feed a guest</button></div>`;
     h += `<div class="btns"><button class="btn" data-act="transfer" ${d.state === 'pen' ? '' : 'disabled'}>${ic('fence')}Move <small>${fmtK(TRANSFER_FEE)}</small></button><button class="btn" data-act="sell">Sell to a zoo <small>${fmtK(S.cost * 0.4)}</small></button></div></div>`;
   }
@@ -1478,7 +1679,7 @@ function renderSheet(){
     const list = dinos.filter(d => d.state !== 'wild' && d.state !== 'carcass');
     h += header('Dinosaurs', 'dino') + `<div class="bd">`;
     if (!list.length) h += `<div class="note">No dinosaurs yet. Build an enclosure and a Hatchery, then tap the enclosure and choose Add dinosaur.</div>`;
-    h += `<div class="list">` + list.map(d => `<button class="li" data-dino="${d.id}">${ic('dino')}<span class="t"><b>${d.name}</b><span>${SPECIES[d.sp].name} - ${pens.get(d.pen) ? pens.get(d.pen).name : ''} - ${dinoStatus(d)}</span></span>${meter(1 - d.hunger)}</button>`).join('') + `</div>`;
+    h += `<div class="list">` + list.map(d => `<button class="li" data-dino="${d.id}">${ic('dino')}<span class="t"><b>${escH(d.name)}</b><span>${SPECIES[d.sp].name} - ${pens.get(d.pen) ? pens.get(d.pen).name : ''} - ${dinoStatus(d)}</span></span>${meter(1 - d.hunger)}</button>`).join('') + `</div>`;
     if (pens.size){ h += `<div class="lbl" style="margin:14px 0 6px">Enclosures</div><div class="list">` + [...pens.values()].map(p => `<button class="li" data-pen="${p.id}">${ic('fence')}<span class="t"><b>${p.name}</b><span>${FT[p.tier].name} - ${dinos.filter(d => d.pen === p.id).length} animals${penWeak(p) ? ' - FENCE TOO WEAK' : ''}${penBroken(p) ? ' - BREACHED' : ''}</span></span></button>`).join('') + `</div>`; }
     h += `</div>`;
   }
@@ -1495,7 +1696,7 @@ function renderSheet(){
       <div class="row"><span class="k">Construction and hatching</span><span class="v">-${fmt(L.build + L.hatch)}</span></div><div class="row"><span class="k">Fines and emergencies</span><span class="v">-${fmt(L.fines + L.other)}</span></div>
       <div class="row"><span class="k"><b>Profit so far</b></span><span class="v" style="color:${pr < 0 ? '#ff8a6a' : 'var(--ok)'}">${fmt(pr)}</span></div>
       <div class="row"><span class="k">Incidents</span><span class="v">${G.stats.breakouts} breakouts, ${G.stats.deaths + G.stats.fed} guests lost</span></div>
-      ${(() => { const lc = landCounts(); return G.expand ? `<div class="note">Expansion permit owned: ${lc.total} buildable tiles (${lc.old} original + ${lc.locked} new).</div>` : `<div class="lbl" style="margin:14px 0 4px">Expand the island</div><div class="note">An Expansion permit opens ${lc.locked} new tiles (${Math.round(lc.locked / lc.old * 100)}% more land): flat east lowlands for lakes, the west highlands, and the northern valleys. Extend your paths to reach them.</div><div class="btns"><button class="btn pri" data-act="expand" ${G.money < EXPAND_COST ? 'disabled' : ''}>Buy Expansion permit <small>${fmtK(EXPAND_COST)}</small></button></div>`; })()}
+      ${(() => { const lc = landCounts(); const ma = monoAdvice(), ml = MONO.lines.filter(L => L.ok); return G.expand ? `<div class="note">Expansion permit owned: ${lc.total} buildable tiles (${lc.old} original + ${lc.locked} new rough ground). ${ml.length ? `Monorail: ${ml.length} line${ml.length > 1 ? 's' : ''} running, ${G.stats.monoRides || 0} rides so far.` : 'No footpath crosses the ridge: build a Monorail (Build > Paths) to bring guests out there.'}${G.monoCredit ? ` Free starter line: ${fmt(G.monoCredit)} of track credit.` : ''}</div>${ma ? `<div class="note warn">${ma}</div>` : ''}` : `<div class="lbl" style="margin:14px 0 4px">Expand the island</div><div class="note">An Expansion permit opens ${lc.locked} new tiles (${Math.round(lc.locked / lc.old * 100)}% more land) of rugged hills, cliffs and jungle beyond a rocky ridge. Footpaths cannot cross the ridge: guests reach it by a Monorail you build. Levelling rough ground costs extra.</div><div class="btns"><button class="btn pri" data-act="expand" ${G.money < EXPAND_COST ? 'disabled' : ''}>Buy Expansion permit <small>${fmtK(EXPAND_COST)}</small></button></div>`; })()}
       <div class="lbl" style="margin:12px 0 4px">Building colours (park-wide)</div><div class="chips">${M.BLD_PALETTES.map(P => `<button class="chip ${P.id === (G.bldPal || 'classic') ? 'on' : ''}" data-bpal="${P.id}">${P.cols ? `<span class="sw" style="background:linear-gradient(90deg,${P.cols.map(c => '#' + c.toString(16).padStart(6, '0')).join(',')})"></span>` : ''}${P.name}</button>`).join('')}</div>
       <div class="btns"><button class="btn" data-act="quality">Graphics: ${['Low', 'Medium', 'High'][QUALITY.level]}</button><button class="btn" data-act="save">${ic('save')}Save</button></div>
       <div class="btns"><button class="btn pri" data-act="tips">How to make money</button><button class="btn" data-act="income">Income</button></div>
@@ -1506,11 +1707,12 @@ function renderSheet(){
       <div class="lbl" style="margin:12px 0 4px">What guests want</div>` + (N.top.length ? N.top.map(o => `<div class="need"><b>${o.pct}% ${o.label}</b><span>${o.tip}</span></div>`).join('') : `<div class="note">${N.n ? 'Nobody is complaining. Keep it up.' : 'No guests yet. They arrive while the park is open.'}</div>`) +
       `<div class="ds" style="margin-top:10px;font-size:12px;color:var(--bone2)">Tap a guest to see what they are thinking.</div></div>`; }
   else if (k === 'guest'){ const g = sel.ref; if (!g || g.gone){ closeSheet(); return; } const th = guestThought(g);
-    const doing = g.state === 'leave' ? 'Heading home' : g.state === 'flee' ? 'Running for the exit' : g.linger > 0 && g.goal === 'view' ? 'Watching the dinosaurs' : g.goal === 'food' ? 'Looking for food' : g.goal === 'drink' ? 'Looking for a drink' : g.goal === 'restroom' ? 'Looking for a restroom' : g.goal === 'view' ? 'Walking to an exhibit' : g.goal === 'gift' ? 'Off to the gift shop' : 'Exploring the park';
+    const fav = guestFavDino(g), wp = g.linger > 0 && g.goal === 'view' && g.goalPen >= 0 ? dinos.filter(x => x.pen === g.goalPen && x.state === 'pen') : [], wd = wp.length ? wp[g.id % wp.length] : null;
+    const doing = g.state === 'ride' ? 'Riding the Monorail' : g.state === 'queue' ? 'Queueing for the Monorail' : wd ? `Watching ${escH(wd.name)} the ${SPECIES[wd.sp].short}` : g.state === 'leave' ? 'Heading home' : g.state === 'flee' ? 'Running for the exit' : g.linger > 0 && g.goal === 'view' ? 'Watching the dinosaurs' : g.goal === 'food' ? 'Looking for food' : g.goal === 'drink' ? 'Looking for a drink' : g.goal === 'restroom' ? 'Looking for a restroom' : g.goal === 'view' ? 'Walking to an exhibit' : g.goal === 'gift' ? 'Off to the gift shop' : 'Exploring the park';
     h += header(guestName(g), 'guests') + `<div class="bd"><div class="ds" style="margin:-4px 0 8px;color:var(--bone2);font-size:13px">${doing}. ${fmt(Math.round(g.money))} left to spend.</div>
       ${th ? `<div class="thought">“${THOUGHT_TEXT[th]}”</div>` : `<div class="thought">“Having a nice time.”</div>`}
       <div class="row"><span class="k">Happiness</span>${meter(g.happy / 100)}</div><div class="row"><span class="k">Hunger</span>${meter(clamp(g.hunger, 0, 1), true)}</div><div class="row"><span class="k">Thirst</span>${meter(clamp(g.thirst || 0, 0, 1), true)}</div><div class="row"><span class="k">Restroom</span>${meter(clamp(g.bladder, 0, 1), true)}</div>
-      <div class="row"><span class="k">Boredom</span>${meter(g.bored || 0, true)}</div><div class="row"><span class="k">Exhibits seen</span><span class="v">${g.seen ? g.seen.size : 0} of ${pens.size}</span></div></div>`; }
+      <div class="row"><span class="k">Boredom</span>${meter(g.bored || 0, true)}</div><div class="row"><span class="k">Exhibits seen</span><span class="v">${g.seen ? g.seen.size : 0} of ${pens.size}</span></div>${fav ? `<div class="row"><span class="k">Favourite dinosaur</span><span class="v">${escH(fav.name)} (${SPECIES[fav.sp].short})</span></div>` : ''}</div>`; }
   else if (k === 'goals'){
     h += header('Goals', 'goals') + `<div class="bd">` + MISSIONS.map(m => `<div class="mis ${G.missions.includes(m.id) ? 'done' : ''}"><span class="ck">${G.missions.includes(m.id) ? ic('check') : ''}</span><div><b>${m.name}</b><span>${m.desc} Reward ${fmt(m.reward)}.</span></div></div>`).join('') +
       `<div class="lbl" style="margin:12px 0 6px">Unlocks</div><div class="note">${SP_KEYS.map(s => `${SPECIES[s].short}: ${SPECIES[s].stars ? SPECIES[s].stars + ' stars' : 'available'}`).join('<br>')}</div></div>`;
@@ -1527,8 +1729,8 @@ $('sheet').onclick = (e) => {
   if (t.dataset.scheme || t.dataset.pattern !== undefined){ const d = sel.ref; if (!d || !d.model) return; const sc = t.dataset.scheme || d.sc || 'natural', pt = t.dataset.pattern !== undefined ? +t.dataset.pattern : (d.pt ?? -1); d.sc = sc; d.pt = pt; d.model.setScheme(sc, pt); renderSheet(); saveGame(); return; }
   if (t.dataset.bpal){ const id = t.dataset.bpal; if (sel.kind === 'park'){ G.bldPal = id; applyPalettes(); } else { const b = buildings.get(sel.ref); if (b){ b.pal = id === 'park' ? null : id; setBldPal(b.mesh, palOf(b)); } } renderSheet(); saveGame(); return; }
   if (t.dataset.fence !== undefined){ const tier = +t.dataset.fence; if (G.stars < FENCE_STARS[tier] && !G.unlockAll){ toast(`${FT[tier].name} unlocks at ${FENCE_STARS[tier]} stars.`, 'bad'); return; } startTool({ kind: 'pen', tier, pk: penKindSel }); return; }
-  if (t.dataset.tool){ startTool({ kind: t.dataset.tool }); return; }
-  if (t.dataset.bld){ const ty = t.dataset.bld; if (G.stars < BUILD[ty].stars && !G.unlockAll){ toast(`${BUILD[ty].name} unlocks at ${BUILD[ty].stars} stars.`, 'bad'); return; } startTool({ kind: 'bld', type: ty }); return; }
+  if (t.dataset.tool){ if (t.dataset.tool === 'mono' && !G.expand){ toast('The monorail serves the new land. Buy the Expansion permit in Park first.', 'bad'); return; } startTool({ kind: t.dataset.tool }); return; }
+  if (t.dataset.bld){ const ty = t.dataset.bld; if (ty === 'station' && !G.expand){ toast('Monorail stations come with the Expansion permit (Park).', 'bad'); return; } if (G.stars < BUILD[ty].stars && !G.unlockAll){ toast(`${BUILD[ty].name} unlocks at ${BUILD[ty].stars} stars.`, 'bad'); return; } startTool({ kind: 'bld', type: ty }); return; }
   if (t.dataset.dino){ const d = dinos.find(x => x.id === +t.dataset.dino); if (d){ openSheet('dino', d); focusOn(d.x, d.z, Math.max(30, SPECIES_DATA[d.sp].size * 3)); } return; }
   if (t.dataset.pen){ const p = pens.get(+t.dataset.pen); if (p){ openSheet('pen', p.id); const [cx, cz] = penCenter(p); focusOn(cx, cz, Math.max(50, (p.i1 - p.i0 + 1) * TILE * 1.6)); } return; }
   if (t.dataset.sp){ const pen = pens.get(sel.ref); const s = t.dataset.sp; if (!unlocked(s)){ toast(`${SPECIES[s].name} unlocks at ${SPECIES[s].stars} stars.`, 'bad'); return; }
@@ -1550,6 +1752,9 @@ $('sheet').onclick = (e) => {
   if (act === 'feed'){ if (feedGuest(pen)) closeSheet(); return; }
   if (act === 'feedd'){ const p = pens.get(sel.ref.pen); if (p && feedGuest(p)) closeSheet(); return; }
   if (act === 'demolish'){ if (!t.dataset.confirm){ t.dataset.confirm = '1'; t.innerHTML = 'Tap again to demolish'; return; } const refund = penCost(pen.i0, pen.j0, pen.i1, pen.j1, pen.tier, pen.kind) * 0.5; G.money += refund; removePen(pen); afterStructureChange(); closeSheet(); return; }
+  if (act === 'rename'){ sel.renaming = true; renderSheet(); const inp = $('dinoName'); if (inp){ inp.addEventListener('input', () => { const v = inp.value.replace(/^\s+/, '').replace(/\s{2,}/g, ' '); if (v !== inp.value) inp.value = v; }); inp.focus(); inp.select(); } return; }
+  if (act === 'renameok'){ const inp = $('dinoName'); const d = sel.ref; if (inp && !cleanName(inp.value)){ toast('Type a name first.', 'bad'); inp.focus(); return; } sel.renaming = false; if (inp) renameDino(d, inp.value); renderSheet(); return; }
+  if (act === 'renamecancel'){ sel.renaming = false; renderSheet(); return; }
   if (act === 'follow'){ cam.follow = cam.follow === sel.ref ? null : sel.ref; renderSheet(); return; }
   if (act === 'openpen'){ openSheet('pen', sel.ref.pen); return; }
   if (act === 'transfer'){ startTransfer(sel.ref); return; }
@@ -1628,7 +1833,13 @@ const fmtRate = v => (v >= 0 ? '+' : '-') + fmt(Math.abs(Math.round(v / 10) * 10
 function updateIncomeChip(){ const el = $('incomeV'); if (!el) return; const r = flowPerMin(); if (!r){ el.textContent = 'Income: tap for tips'; el.className = 'inc'; return; }
   el.textContent = fmtRate(r.net); el.className = 'inc ' + (r.net >= 0 ? 'pos' : 'neg'); }
 // names the single biggest money drain with one concrete fix
-function moneyAdvisor(){ const out = []; const perDay = (DAY_END - DAY_START);
+function monoAdvice(){ if (!G.expand) return null; const cut = expansionCut(); const stations = [...buildings.values()].filter(b => b.type === 'station');
+  if (!cut.length) return null; const names = cut.map(p => p.name).join(', ');
+  if (!stations.length) return `${names} ${cut.length > 1 ? 'have' : 'has'} no visitors: guests cannot walk over the ridge. Build a Monorail Station by your paths, another on the new land, and link them with Monorail track.`;
+  if (!monoOperational()) return `${names} ${cut.length > 1 ? 'have' : 'has'} no visitors yet. Link your stations with Monorail track, and make sure each station touches a path.`;
+  return `${names} ${cut.length > 1 ? 'are' : 'is'} not on a path joined to a monorail station. Connect ${cut.length > 1 ? 'them' : 'it'} to the station path.`; }
+function monoAdvisorTick(){ const a = monoAdvice(); if (!a){ G.monoTipAt = 0; return; } const h = absHour(); if (G.monoTipAt && h - G.monoTipAt < 8) return; G.monoTipAt = h; toast(a, 'bad'); }
+function moneyAdvisor(){ const out = []; { const a = monoAdvice(); if (a) out.push({ k: 'mono', amt: 1e9, text: a }); } const perDay = (DAY_END - DAY_START);
   const L = G.prevLedger ? G.prevLedger.L : null, cur = G.ledger; const emerg = Math.max(L ? L.fines + L.other : 0, cur.fines + cur.other);
   // animals: upkeep + about one feeder bill a day
   const bySp = {}; for (const d of dinos){ if (d.state === 'wild') continue; (bySp[d.sp] = bySp[d.sp] || []).push(d); }
@@ -1672,6 +1883,9 @@ function showIncome(){ tutFlags.income = true; const r = flowPerMin(); const m =
     ${(() => { const A = moneyAdvisor(); const t = A.top && (A.top.amt > 600 || !A.income) ? A.top.text : A.income; return t ? `<div class="advisor"><b>Money advisor</b><span>${t}</span></div>` : ''; })()}
     <div class="btns"><button class="btn" data-act="tips">How to make money</button><button class="btn pri" data-act="ok">Close</button></div></div>`;
   m.classList.remove('hidden'); m.onclick = (e) => { const b = e.target.closest('[data-act]'); if (!b) return; SFX.click(); if (b.dataset.act === 'tips') showMoneyTips(); else m.classList.add('hidden'); }; }
+function showNotice(title, text){ if (G && G.headless) return; const m = $('modal'); if (!m.classList.contains('hidden') || !$('tut').classList.contains('hidden')){ setTimeout(() => showNotice(title, text), 2500); return; }
+  m.innerHTML = `<div class="box glass"><div class="lbl">Primeval Park</div><h2>${title}</h2><div class="sub">${text}</div><div class="btns"><button class="btn pri" data-act="ok">Got it</button></div></div>`;
+  m.classList.remove('hidden'); m.onclick = (e) => { const b = e.target.closest('[data-act]'); if (!b) return; SFX.click(); m.classList.add('hidden'); }; }
 function showMoneyTips(){ const m = $('modal'); const best = 48; const sp = SPECIES; const gf = expectedGuestsPerDay() / (24 + appealTotal() * 1.8);
   const li = (h, t) => `<div class="tip"><b>${h}</b><span>${t}</span></div>`;
   m.innerHTML = `<div class="box glass tips"><div class="lbl">Director's guide</div><h2>How to make money</h2>
@@ -1730,7 +1944,7 @@ const nodeMat = new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true
 const nodeMatLast = new THREE.MeshBasicMaterial({ color: 0xffb648, transparent: true, opacity: 0.95, depthTest: false, fog: false });
 const nodeGeo = new THREE.CylinderGeometry(1.1, 1.1, 0.25, 20);
 let nodeMeshes = [];
-function clearPending(){ pendMesh.visible = false; for (const m of nodeMeshes) scene.remove(m); nodeMeshes = []; }
+function clearPending(){ pendMesh.visible = false; if (monoPrev) monoPrev.visible = false; for (const m of nodeMeshes) scene.remove(m); nodeMeshes = []; }
 function pathRoute(a, b){ const out = []; let [i, j] = a; const [i1, j1] = b; const xFirst = Math.abs(i1 - i) >= Math.abs(j1 - j);
   out.push([i, j]); const stepI = () => { while (i !== i1){ i += Math.sign(i1 - i); out.push([i, j]); } }, stepJ = () => { while (j !== j1){ j += Math.sign(j1 - j); out.push([i, j]); } };
   if (xFirst){ stepI(); stepJ(); } else { stepJ(); stepI(); } return out; }
@@ -1738,7 +1952,7 @@ function pathTileOk(i, j){ if (!inGrid(i, j)) return 'Outside the park'; const t
 function pendingTiles(){ const seen = new Set(), out = []; if (!tool || !tool.nodes) return out;
   const add = ([i, j]) => { const k = idx(i, j); if (seen.has(k)) return; seen.add(k); if (tileType[k] === T_EMPTY) out.push([i, j]); };
   if (tool.nodes.length === 1) add(tool.nodes[0]); for (const s of tool.segs) s.forEach(add); return out; }
-function pendingCost(){ return pendingTiles().length * BUILD.path.cost; }
+function pendingCost(){ return pathTilesCost(pendingTiles()); }
 function drawPending(){ clearPending(); if (!tool || tool.kind !== 'path' || !tool.nodes || !tool.nodes.length) return;
   const all = []; const seen = new Set(); const push = ([i, j]) => { const k = idx(i, j); if (!seen.has(k)){ seen.add(k); all.push([i, j]); } }; tool.nodes.forEach(push); tool.segs.forEach(s => s.forEach(push));
   const pos = []; const q = TILE * 0.47;
@@ -1747,19 +1961,26 @@ function drawPending(){ clearPending(); if (!tool || tool.kind !== 'path' || !to
   tool.nodes.forEach((n, k) => { const m = new THREE.Mesh(nodeGeo, k === tool.nodes.length - 1 ? nodeMatLast : nodeMat); const x = tX(n[0]), z = tZ(n[1]); m.position.set(x, H(x, z) + 0.4, z); m.renderOrder = 7; scene.add(m); nodeMeshes.push(m); }); }
 function startTool(t){ tool = t; closeSheet(); TU.uGrid.value = 1; $('dock').classList.add('hidden');
   if (t.kind === 'path'){ t.nodes = []; t.segs = []; }
+  if (t.kind === 'mono'){ t.nodes = []; t.st = []; t.loop = false; }
   if (t.kind === 'bld'){ ghost = new THREE.Mesh(bldGeo(t.type), ghostMat); ghost.visible = false; scene.add(ghost); t.rot = null; t.hover = null; }
   renderToolbar(); $('toolbar').classList.remove('hidden'); placeUndoBar(); }
 function cancelTool(){ if (!tool) return; if (tool.kind === 'penmove' && tool.p) cancelPenMove(); if (tool.move){ const m = tool.move; tool.move = null; const opts = { id: m.id }; if (!BUILD[m.type].inPen) opts.rot = m.rot; placeBuilding(m.type, m.i, m.j, opts); afterStructureChange(); } tool = null; TU.uGrid.value = 0; hideOverlay(); $('toolbar').classList.add('hidden'); if (G.running) $('dock').classList.remove('hidden'); placeUndoBar(); }
 function renderToolbar(){
   if (!tool) return; const tb = $('toolbar'); let title = '', hint = '', cost = '', costBad = false, btns = '';
-  if (tool.kind === 'path'){ title = 'Footpath'; const n = tool.nodes.length, tiles = pendingTiles().length, c = tiles * BUILD.path.cost;
+  if (tool.kind === 'path'){ title = 'Footpath'; const n = tool.nodes.length, pt = pendingTiles(), tiles = pt.length, c = pathTilesCost(pt), gr = c - tiles * BUILD.path.cost;
     hint = !n ? 'Tap where the path starts. Drag to look around.' : n === 1 ? 'Tap the next point to lay a segment.' : `${tool.segs.length} segment${tool.segs.length > 1 ? 's' : ''}, ${tiles} new tile${tiles === 1 ? '' : 's'}. Tap to extend.`;
+    if (gr > 0) hint += ` Includes ${fmt(gr)} grading on rough ground.`;
     cost = n ? fmt(c) : fmt(BUILD.path.cost) + ' / tile'; costBad = n > 0 && G.money < c;
     btns = `<button class="btn" data-t="exit">Cancel</button><button class="btn" data-t="undo" ${n ? '' : 'disabled'}>${ic('undo')}Undo</button><button class="btn pri" data-t="pathdone" ${costBad ? 'disabled' : ''}>${tiles ? 'Done' : 'Close'}</button>`; }
+  if (tool.kind === 'mono'){ title = 'Monorail Track'; const n = tool.nodes.length, len = n > 1 ? monoToolLen() : 0, c = monoToolCost(), due = monoToolDue(), ready = monoToolReady();
+    hint = !n ? 'Tap a Monorail Station to start. Drag to look around.' : n === 1 ? 'Tap points across the ridge. Pillars follow the ground.' : ready ? `${Math.round(len)} m of track${tool.loop ? ', closed loop' : ''}. Done builds it, or keep extending.` : `${Math.round(len)} m. End the track on another station.`;
+    if (n > 1 && due < c) hint += ` Starter credit covers ${fmt(c - due)}.`;
+    cost = n > 1 ? fmt(due) : fmt(MONO_COST_M) + ' / m'; costBad = n > 1 && G.money < due;
+    btns = `<button class="btn" data-t="exit">Cancel</button><button class="btn" data-t="undo" ${n ? '' : 'disabled'}>${ic('undo')}Undo</button><button class="btn pri" data-t="pathdone" ${ready && !costBad ? '' : 'disabled'}>Done</button>`; }
   if (tool.kind === 'bulldoze'){ title = 'Bulldoze'; hint = 'Tap a path tile, building or feeder to remove it (50% refund). Drag to look around.'; btns = `<button class="btn pri" data-t="exit">Done</button>`; }
-  if (tool.kind === 'bld'){ const B = BUILD[tool.type]; const mv = !!tool.move; title = (mv ? 'Move ' : '') + B.name; cost = mv ? 'Free' : fmt(B.cost); const hv = tool.hover; const ok = hv && hv[2].ok; const funds = mv || G.money >= B.cost;
+  if (tool.kind === 'bld'){ const B = BUILD[tool.type]; const mv = !!tool.move; title = (mv ? 'Move ' : '') + B.name; const hv = tool.hover; const bc0 = hv ? bldCost(tool.type, hv[0], hv[1]) : B.cost, bc = tool.type === 'station' ? Math.max(0, bc0 - (G.monoCredit || 0)) : bc0; cost = mv ? 'Free' : bc < bc0 ? `${fmt(bc)} (credit)` : fmt(bc); const ok = hv && hv[2].ok; const funds = mv || G.money >= bc;
     costBad = !funds || (hv && !ok);
-    hint = !hv ? (B.inPen ? 'Tap a tile inside an enclosure to preview.' : 'Tap open ground next to a path to preview.') + ' Drag to look around.' : !ok ? hv[2].why : !funds ? 'Not enough funds.' : mv ? 'Drag it or tap a new spot, then Place. Cancel puts it back.' : 'Green means it fits. Drag the preview or tap elsewhere to move it.';
+    hint = !hv ? (B.inPen ? 'Tap a tile inside an enclosure to preview.' : 'Tap open ground next to a path to preview.') + ' Drag to look around.' : !ok ? hv[2].why : !funds ? 'Not enough funds.' : mv ? 'Drag it or tap a new spot, then Place. Cancel puts it back.' : (bc0 > B.cost ? `Rough ground: ${fmt(bc0 - B.cost)} to level a pad. ` : '') + (tool.type === 'station' ? 'Stations must touch a path. Then lay Monorail track between stations.' : 'Green means it fits. Drag the preview or tap elsewhere to move it.');
     btns = `<button class="btn" data-t="rotate" ${hv && !B.inPen ? '' : 'disabled'}>${ic('rotate')}Rotate</button><button class="btn" data-t="exit">${hv || mv ? 'Cancel' : 'Close'}</button><button class="btn pri" data-t="place" ${ok && funds ? '' : 'disabled'}>Place</button>`; }
   if (tool.kind === 'transfer'){ const d = tool.d, pk = tool.pick; title = 'Move ' + d.name; cost = fmt(TRANSFER_FEE); costBad = G.money < TRANSFER_FEE;
     hint = pk && !pk.chk.ok ? `${pk.P.name}: ${pk.chk.why}. Tap a green enclosure.` : `Tap a green enclosure. Rangers dart ${d.name} and airlift it there.`;
@@ -1784,7 +2005,8 @@ $('toolbar').onclick = (e) => { const b = e.target.closest('button'); if (!b || 
   if (a === 'exit'){ const penId = tool.pen; cancelTool(); if (penId && pens.has(penId)) openSheet('pen', penId); return; }
   if (a === 'cancel'){ tool.rect = null; tool.pending = false; tool.a = null; hideOverlay(); renderToolbar(); return; }
   if (a === 'undo' && tool.kind === 'path'){ if (tool.segs.length) tool.segs.pop(); tool.nodes.pop(); drawPending(); renderToolbar(); return; }
-  if (a === 'pathdone'){ commitPaths(); return; }
+  if (a === 'undo' && tool.kind === 'mono'){ if (tool.loop) tool.loop = false; else { tool.nodes.pop(); tool.st.pop(); } drawMonoPreview(); renderToolbar(); return; }
+  if (a === 'pathdone'){ if (tool.kind === 'mono') commitMono(); else commitPaths(); return; }
   if (tool.kind === 'penmove'){ if (a === 'rotate') penRotate(); if (a === 'place') commitPenMove(); if (a === 'exit') cancelTool(); return; }
   if (a === 'rotate' && tool.hover){ const [i, j] = tool.hover, [w, h] = footprint(tool.type, 0); const cur = tool.rot ?? faceRot(i, j, w, h); tool.rot = Math.round((cur + Math.PI / 2) / (Math.PI / 2)) % 4 * (Math.PI / 2); setPreview([i + Math.floor((w - 1) / 2), j + Math.floor((h - 1) / 2)]); return; }
   if (a === 'place'){ commitBuilding(); return; }
@@ -1806,6 +2028,7 @@ function toolTap(p){ const t = tileAtScreen(p.x, p.y); if (!t){ return; }
   if (tool.kind === 'penmove'){ penPreviewCentred(t); keepPenVisible(); return; }
   if (tool.kind === 'transfer'){ transferTap(p); return; }
   if (tool.kind === 'bulldoze'){ bulldozeTap(p); return; }
+  if (tool.kind === 'mono'){ monoTap(t); return; }
   if (tool.kind === 'path'){ const N = tool.nodes; const why = pathTileOk(t[0], t[1]); if (why){ toast(why, 'bad'); return; }
     if (!N.length){ N.push(t); drawPending(); renderToolbar(); return; }
     const last = N[N.length - 1]; if (last[0] === t[0] && last[1] === t[1]) return;
@@ -1840,19 +2063,19 @@ function keepPreviewVisible(){ if (!ghost || !ghost.visible) return; const tb = 
   const sy = (-_pvp.y * 0.5 + 0.5) * innerHeight; if (sy > tb.top - 40 || sy < 150){ cam.goal.tx = ghost.position.x; cam.goal.tz = ghost.position.z; cam.follow = null; } }
 function commitBuilding(){ const hv = tool.hover; if (!hv) return; const [i, j] = hv; const B = BUILD[tool.type]; const chk = canPlace(tool.type, i, j);
   if (!chk.ok){ toast(chk.why, 'bad'); return; }
-  if (tool.move){ const m = tool.move; const opts = { id: m.id }; if (!B.inPen) opts.rot = tool.rot ?? faceRot(i, j, m.w, m.h); const b = placeBuilding(m.type, i, j, opts); tool.move = null; SFX.build(); dust(b.x, b.z, 3, 5); afterStructureChange(); cancelTool(); toast(`${B.name} moved.`, 'good'); return; } if (G.money < B.cost){ toast('Not enough funds.', 'bad'); return; }
-  spend('build', B.cost); const opts = {}; if (!B.inPen && tool.rot != null) opts.rot = tool.rot; const b = placeBuilding(tool.type, i, j, opts); SFX.build(); dust(b.x, b.z, 4, 6); afterStructureChange();
-  recordUndo({ kind: 'bld', b, cost: B.cost, label: B.name });
-  if (SHOP_T.includes(tool.type)){ const touches = [[0, -1], [-1, 0], [b.w, 0], [0, b.h]].some(([di, dj]) => isPath(i + di, j + dj)); if (!touches) toast('Tip: shops must touch a path to get customers.', ''); }
+  if (tool.move){ const m = tool.move; const opts = { id: m.id }; if (!B.inPen) opts.rot = tool.rot ?? faceRot(i, j, m.w, m.h); const b = placeBuilding(m.type, i, j, opts); tool.move = null; SFX.build(); dust(b.x, b.z, 3, 5); afterStructureChange(); cancelTool(); toast(`${B.name} moved.`, 'good'); return; } const bc0 = bldCost(tool.type, i, j), cr = tool.type === 'station' ? Math.min(G.monoCredit || 0, bc0) : 0, bc = bc0 - cr; if (G.money < bc){ toast('Not enough funds.', 'bad'); return; }
+  if (cr) G.monoCredit -= cr; spend('build', bc); const opts = {}; if (!B.inPen && tool.rot != null) opts.rot = tool.rot; const b = placeBuilding(tool.type, i, j, opts); SFX.build(); dust(b.x, b.z, 4, 6); afterStructureChange();
+  recordUndo({ kind: 'bld', b, cost: bc, label: B.name });
+  if (SHOP_T.includes(tool.type) || tool.type === 'station'){ const touches = [[0, -1], [-1, 0], [b.w, 0], [0, b.h]].some(([di, dj]) => isPath(i + di, j + dj)); if (!touches) toast('Tip: shops must touch a path to get customers.', ''); }
   if (tool.type === 'hatchery' && !G.tutHatch){ G.tutHatch = true; toast('Hatchery ready. Tap an enclosure and choose Add dinosaur.', 'good'); }
   tool.hover = null; tool.rot = null; overlay.visible = false; outline.visible = false; if (ghost) ghost.visible = false; renderToolbar(); }
-function commitPaths(){ const tiles = pendingTiles(), c = tiles.length * BUILD.path.cost;
+function commitPaths(){ const tiles = pendingTiles(), c = pathTilesCost(tiles);
   if (!tiles.length){ cancelTool(); return; } if (G.money < c){ toast('Not enough funds.', 'bad'); return; }
-  for (const [i, j] of tiles) tileType[idx(i, j)] = T_PATH; spend('build', c); afterStructureChange(); SFX.build(); { const cut = tiles.filter(([i, j]) => exitDist[idx(i, j)] >= 1e6).length; if (cut) setTimeout(() => toast(`${cut} of these path tiles do not join the paths from the gate, so guests cannot reach them. Connect them edge to edge.`, 'bad'), 400); }
+  for (const [i, j] of tiles) tileType[idx(i, j)] = T_PATH; spend('build', c); afterStructureChange(); SFX.build(); { const cut = tiles.filter(([i, j]) => !reachK(idx(i, j))); const ex = cut.filter(([i, j]) => isExpK(idx(i, j))).length; if (cut.length) setTimeout(() => toast(ex && !monoOperational() ? `Paths on the new land need a Monorail: guests cannot walk over the ridge. Build a Monorail Station touching this path, one in the park, and link them with track.` : `${cut.length} of these path tiles do not join the paths from the gate${ex ? ' or a monorail station' : ''}, so guests cannot reach them. Connect them edge to edge.`, 'bad'), 400); }
   cancelTool(); recordUndo({ kind: 'paths', tiles, cost: c, label: `${tiles.length} path tile${tiles.length > 1 ? 's' : ''}` }); }
 /* press and hold (~0.5 s, finger still, no tool active) on a building or feeder picks it up to move it */
 function buildingAtScreen(x, y){ const t = tileAtScreen(x, y); if (!t) return null; const k = idx(t[0], t[1]);
-  if (tileType[k] === T_BUILD){ const b = buildings.get(tileRef[k]); return b && !BUILD[b.type].fixed ? b : null; }
+  if (tileType[k] === T_BUILD){ const b = buildings.get(tileRef[k]); return b && !BUILD[b.type].fixed && !BUILD[b.type].noMove ? b : null; }
   if (tileType[k] === T_PEN){ const pen = pens.get(tileRef[k]); const f = pen && pen.feeders.find(f => f.i === t[0] && f.j === t[1]); return f ? buildings.get(f.id) : null; }
   return null; }
 function pickUp(b, p){ closeSheet(); clearUndo(); const m = { id: b.id, type: b.type, i: b.i, j: b.j, w: b.w, h: b.h, rot: b.rot, pen: b.pen };
@@ -1860,7 +2083,7 @@ function pickUp(b, p){ closeSheet(); clearUndo(); const m = { id: b.id, type: b.
   setPreview([m.i + Math.floor((m.w - 1) / 2), m.j + Math.floor((m.h - 1) / 2)]); if (ghost){ ghost.position.y += 0.8; ghost.scale.setScalar(1.06); }
   try { navigator.vibrate && navigator.vibrate(18); } catch (e) {} SFX.click(); }
 function bulldozeTap(p){ const t = tileAtScreen(p.x, p.y); if (!t) return; const k = idx(t[0], t[1]);
-  if (tileType[k] === T_PATH){ if (t[1] === GATE.j && (t[0] === GATE.i || t[0] === GATE.i + 1)){ toast('The gate path stays.', ''); return; } tileType[k] = T_EMPTY; G.money += BUILD.path.cost * 0.5; afterStructureChange(); SFX.build(); return; }
+  if (tileType[k] === T_PATH){ if (t[1] === GATE.j && (t[0] === GATE.i || t[0] === GATE.i + 1)){ toast('The gate path stays.', ''); return; } tileType[k] = tileBase[k] === T_BLOCK ? T_BLOCK : T_EMPTY; G.money += BUILD.path.cost * 0.5; afterStructureChange(); SFX.build(); return; }
   if (tileType[k] === T_BUILD){ const b = buildings.get(tileRef[k]); if (b && !BUILD[b.type].fixed){ G.money += BUILD[b.type].cost * 0.5; removeBuilding(b); afterStructureChange(); SFX.build(); } else toast('That cannot be removed.', ''); }
   else if (tileType[k] === T_PEN){ const pen = pens.get(tileRef[k]); const f = pen.feeders.find(f => f.i === t[0] && f.j === t[1]); if (f){ const b = buildings.get(f.id); G.money += BUILD[b.type].cost * 0.5; removeBuilding(b); afterStructureChange(); } else toast('Open the enclosure to demolish it.', ''); }
 }
@@ -1980,14 +2203,15 @@ function clearUndo(){ undoRec = null; clearTimeout(undoTimer); renderUndoBar(); 
 function refund(c){ G.money += c; G.ledger.build = (G.ledger.build || 0) - c; }
 function undoLast(){ const r = undoRec; if (!r) return; clearUndo();
   if (r.kind === 'bld'){ const b = buildings.get(r.b.id); if (!b){ toast('Already removed.', ''); return; } removeBuilding(b); }
-  if (r.kind === 'paths'){ for (const [i, j] of r.tiles){ const k = idx(i, j); if (tileType[k] === T_PATH) tileType[k] = T_EMPTY; } }
+  if (r.kind === 'mono') monoRemoveLine(r.id);
+  if (r.kind === 'paths'){ for (const [i, j] of r.tiles){ const k = idx(i, j); if (tileType[k] === T_PATH) tileType[k] = tileBase[k] === T_BLOCK ? T_BLOCK : T_EMPTY; } }
   if (r.kind === 'pen'){ if (!pens.has(r.pen.id)) return; if (dinos.some(d => d.pen === r.pen.id)){ toast('A dinosaur already lives there. Demolish it from the enclosure panel instead.', 'bad'); return; } if (sel && sel.kind === 'pen' && sel.ref === r.pen.id) closeSheet(); removePen(r.pen); }
   refund(r.cost); afterStructureChange(); SFX.click(); updateHUD(); toast(`Undone. ${fmt(r.cost)} refunded.`, 'money'); }
 function renderUndoBar(){ const el = $('undoBar'); if (!undoRec){ el.classList.add('hidden'); return; }
   el.innerHTML = `<span>Placed ${undoRec.label}</span><button class="btn" data-t="undolast">${ic('undo')}Undo</button>`; el.classList.remove('hidden'); placeUndoBar(); }
 function placeUndoBar(){ const el = $('undoBar'); if (!el || el.classList.contains('hidden')) return; const ref = tool ? $('toolbar') : $('dock'); const r = ref.getBoundingClientRect(); el.style.bottom = (r.height > 0 ? innerHeight - r.top + 8 : 90) + 'px'; }
 $('undoBar').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; SFX.unlock(); undoLast(); };
-function afterStructureChange(){ drawMask(); computeExitField(); rebuildGuestSpots(); rebuildFences(); refreshVegetation(); computeViewMap(); }
+function afterStructureChange(){ drawMask(); computeExitField(); monoRefresh(); rebuildGuestSpots(); rebuildFences(); refreshVegetation(); computeViewMap(); }
 
 /* ================= camera + input ================= */
 /* v7 camera clipping: pull the camera in front of buildings and fence walls between it and its target (foliage and bark fade out near the camera instead) */
@@ -2014,11 +2238,11 @@ function cameraClearance(ax, ay, az, bx, by, bz){ // fraction of the target->cam
   if (best >= 1) return 1; return clamp(best, Math.min(1, 4 / L), 1); }
 const cam = { tx: 0, tz: 40, clip: 1, yaw: 0.5, pitch: 0.62, dist: 210, goal: { tx: 0, tz: 40, yaw: 0.5, pitch: 0.62, dist: 210 }, shake: 0, follow: null };
 const title = { on: true };
-function focusOn(x, z, dist){ cam.goal.tx = x; cam.goal.tz = z; if (dist) cam.goal.dist = clamp(dist, 12, 330); }
+function focusOn(x, z, dist){ cam.goal.tx = x; cam.goal.tz = z; if (dist) cam.goal.dist = clamp(dist, 12, 560); }
 function updateCamera(dt){
   const g = cam.goal; if (cam.follow){ if (!dinos.includes(cam.follow) || !cam.follow.model.root.visible) cam.follow = null; else { g.tx = cam.follow.x; g.tz = cam.follow.z; } }
   if (title.on){ g.yaw += dt * 0.04; } else updateFling(dt);
-  g.pitch = clamp(g.pitch, 0.1, 1.45); g.dist = clamp(g.dist, 12, 330); g.tx = clamp(g.tx, -WHALF - 30, WHALF + 30); g.tz = clamp(g.tz, -WHALF - 40, HALF + 40);
+  g.pitch = clamp(g.pitch, 0.1, 1.45); g.dist = clamp(g.dist, 12, 560); scene.fog.density = 0.0016 * clamp(1 - (cam.dist - 300) / 680, 0.6, 1); /* v10: the whole island fits when zoomed out */ g.tx = clamp(g.tx, -WHALF - 30, WHALF + 30); g.tz = clamp(g.tz, -WHALF - 40, HALF + 40);
   const k = 10; cam.tx = damp(cam.tx, g.tx, k, dt); cam.tz = damp(cam.tz, g.tz, k, dt); cam.dist = damp(cam.dist, g.dist, k, dt); cam.pitch = damp(cam.pitch, g.pitch, k, dt);
   let dy = g.yaw - cam.yaw; if (dy > Math.PI || dy < -Math.PI){ dy = ((dy + Math.PI) % TAU + TAU) % TAU - Math.PI; g.yaw = cam.yaw + dy; }
   cam.yaw += dy * (1 - Math.exp(-k * dt));
@@ -2095,10 +2319,10 @@ canvas.addEventListener('pointermove', (e) => {
    spread (zoom in) or twist (map turns the same way as the fingers). Rays use the target camera, not the smoothed one. */
 const goalCamera = new THREE.PerspectiveCamera();
 function syncGoalCamera(){ const g = cam.goal; goalCamera.fov = camera.fov; goalCamera.aspect = camera.aspect; goalCamera.near = camera.near; goalCamera.far = camera.far; goalCamera.updateProjectionMatrix();
-  const pitch = clamp(g.pitch, 0.1, 1.45), dist = clamp(g.dist, 12, 330); const ty = Math.max(H(g.tx, g.tz), 0) + 0.5; const cp = Math.cos(pitch);
+  const pitch = clamp(g.pitch, 0.1, 1.45), dist = clamp(g.dist, 12, 560); const ty = Math.max(H(g.tx, g.tz), 0) + 0.5; const cp = Math.cos(pitch);
   goalCamera.position.set(g.tx + Math.sin(g.yaw) * cp * dist, ty + Math.sin(pitch) * dist, g.tz + Math.cos(g.yaw) * cp * dist); goalCamera.lookAt(g.tx, ty, g.tz); goalCamera.updateMatrixWorld(true); }
 function grabMap(l, n){ const g = cam.goal; cam.follow = null; syncGoalCamera(); const A = groundAtScreen(l.cx, l.cy, goalCamera);
-  if (l.d > 10 && n.d > 10) g.dist = clamp(g.dist * l.d / n.d, 12, 330);
+  if (l.d > 10 && n.d > 10) g.dist = clamp(g.dist * l.d / n.d, 12, 560);
   let da = n.ang - l.ang; if (da > Math.PI) da -= TAU; if (da < -Math.PI) da += TAU; g.yaw += da;
   syncGoalCamera(); const B = groundAtScreen(n.cx, n.cy, goalCamera);
   if (A && B){ g.tx += A.x - B.x; g.tz += A.z - B.z; } else panBy(n.cx - l.cx, n.cy - l.cy); }
@@ -2135,8 +2359,8 @@ function endPtr(e){ const p = ptrs.get(e.pointerId); if (!p) return; ptrs.delete
     gesture = null; }
   else if (ptrs.size === 1 && gesture && gesture.kind === 'two'){ gesture = { kind: 'one', moved: true, ghost: false }; const q = [...ptrs.values()][0]; startPan(q.x, q.y); } }
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
-canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.goal.dist = clamp(cam.goal.dist * Math.exp(e.deltaY * 0.0012), 12, 330); }, { passive: false });
-const keys = new Set(); window.addEventListener('keydown', (e) => { keys.add(e.key.toLowerCase()); if (e.key === 'Escape'){ if (tool) cancelTool(); else closeSheet(); } if (e.key === ' ' && G.running){ G.speed = G.speed ? 0 : 1; updateHUD(); e.preventDefault(); } });
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.goal.dist = clamp(cam.goal.dist * Math.exp(e.deltaY * 0.0012), 12, 560); }, { passive: false });
+const keys = new Set(); window.addEventListener('keydown', (e) => { if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')){ if (e.target.id === 'dinoName'){ if (e.key === 'Enter'){ e.preventDefault(); const b = document.querySelector('[data-act=renameok]'); b && b.click(); } else if (e.key === 'Escape'){ e.preventDefault(); const b = document.querySelector('[data-act=renamecancel]'); b && b.click(); } } return; } keys.add(e.key.toLowerCase()); if (e.key === 'Escape'){ if (tool) cancelTool(); else closeSheet(); } if (e.key === ' ' && G.running){ G.speed = G.speed ? 0 : 1; updateHUD(); e.preventDefault(); } });
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 function keyCamera(dt){ if (!keys.size) return; const s = cam.goal.dist * 0.9 * dt; let mx = 0, mz = 0; if (keys.has('w') || keys.has('arrowup')) mz -= 1; if (keys.has('s') || keys.has('arrowdown')) mz += 1; if (keys.has('a') || keys.has('arrowleft')) mx -= 1; if (keys.has('d') || keys.has('arrowright')) mx += 1;
   if (mx || mz){ const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw); cam.goal.tx += (mx * cy + mz * sy) * s; cam.goal.tz += (-mx * sy + mz * cy) * s; cam.follow = null; }
@@ -2185,7 +2409,8 @@ function serialize0(){
 function saveGame(){ if (!G || G.noSave) return; try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); } catch (e) {} }
 function clearWorld(){
   for (const b of buildings.values()) scene.remove(b.mesh); buildings.clear(); pens.clear(); for (const d of dinos) scene.remove(d.model.root); dinos = []; eggs = []; guests = [];
-  for (const j of jeeps) scene.remove(j.mesh); jeeps.length = 0; tileRef.fill(-1); computeBuildable(); if (gateMesh){ scene.remove(gateMesh); gateMesh = null; }
+  for (const j of jeeps) scene.remove(j.mesh); jeeps.length = 0; tileRef.fill(-1); computeBuildable();
+  monoClearRuntime(); if (PADS.length){ const pp = PADS.splice(0); for (const p of pp) retopo(p.x0 - 4, p.z0 - 4, p.x1 + 4, p.z1 + 4); } if (gateMesh){ scene.remove(gateMesh); gateMesh = null; }
 }
 let gateMesh = null;
 function placeGate(){ for (const i of [GATE.i, GATE.i + 1]){ tileType[idx(i, GATE.j)] = T_PATH; } gateMesh = makeBuildingMesh('gate'); setBldPal(gateMesh, palOf(null)); const x = eX(GATE.i + 1), z = tZ(GATE.j); gateMesh.position.set(x, H(x, z) - 0.1, z); scene.add(gateMesh); }
@@ -2207,15 +2432,22 @@ function migrateV9(){ if (G.v9) return; G.v9 = true; let n = 0;
   if (mixed.length){ G.predAt = absHour() + 6; }
   setTimeout(() => { if (n) toast(`Park update: dinosaurs now need water. ${n} free Water Hole${n > 1 ? 's were' : ' was'} added to your enclosures.`, 'good');
     if (mixed.length) setTimeout(() => toast(`Warning: carnivores now hunt animals they share an enclosure with. ${mixed.map(p => p.name).join(', ')} ${mixed.length > 1 ? 'are' : 'is'} mixed. Hunting starts in 6 park hours. Move them apart.`, 'bad'), 2500); }, 1500); }
+// v10 upgrade: the expansion became rough country behind a ridge. Paths over the ridge are removed (nothing else is touched) and parks that already own the permit get a free starter monorail
+const MONO_CREDIT = 140000;
+function migrateV10(){ if (G.v10) return; G.v10 = true; if (!G.expand) return; let cut = 0;
+  for (let k = 0; k < tileType.length; k++){ if (tileType[k] !== T_PATH || !ridgeMask[k]) continue; const i = kI(k), j = kJ(k); if (j === GATE.j && (i === GATE.i || i === GATE.i + 1)) continue; tileType[k] = T_BLOCK; cut++; }
+  G.monoCredit = MONO_CREDIT; const exp = [...pens.values()].some(p => isExpK(idx((p.i0 + p.i1) >> 1, (p.j0 + p.j1) >> 1))) || [...buildings.values()].some(b => isExpK(idx(b.i, b.j)));
+  setTimeout(() => showNotice('Park update', `The new land is now rough country beyond a rocky ridge${cut ? `, and ${cut} path tile${cut > 1 ? 's' : ''} over the ridge ${cut > 1 ? 'were' : 'was'} removed` : ''}. ${exp ? 'Everything you built out there stays. ' : ''}Guests now reach it by Monorail: your first ${fmt(MONO_CREDIT)} of stations and track is free (Build > Paths).`), 1800); }
 function fmtHourIn(at){ const h = Math.max(0, at - absHour()); return h < 1 ? 'within the hour' : `in ${Math.ceil(h)} park hour${Math.ceil(h) > 1 ? 's' : ''}`; }
 function loadGame(){
   const raw = localStorage.getItem(SAVE_KEY); if (!raw) return false; let S; try { S = JSON.parse(raw); } catch (e) { return false; } if (!S || S.v !== 1) return false;
-  clearWorld(); G = Object.assign(freshState(), S.G); G.stats = Object.assign(freshState().stats, S.G.stats || {}); G.ledger = Object.assign(freshState().ledger, S.G.ledger || {}); G.v9 = !!S.G.v9; G.spScheme = S.G.spScheme || {}; G.bldPal = S.G.bldPal || 'classic';
+  clearWorld(); G = Object.assign(freshState(), S.G); G.stats = Object.assign(freshState().stats, S.G.stats || {}); G.ledger = Object.assign(freshState().ledger, S.G.ledger || {}); G.v9 = !!S.G.v9; G.v10 = !!S.G.v10; G.mono = S.G.mono && S.G.mono.lines ? S.G.mono : { lines: [] }; G.spScheme = S.G.spScheme || {}; G.bldPal = S.G.bldPal || 'classic';
   applyExpansion(); placeGate(); if (S.p2) for (let n = 0; n + 1 < S.p2.length; n += 2) tileType[idx(S.p2[n], S.p2[n + 1])] = T_PATH; else for (const k of S.paths) tileType[idx(k % GRID, (k / GRID) | 0)] = T_PATH;
   for (const p of S.pens) createPen(p.i0, p.j0, p.i1, p.j1, p.tier, { id: p.id, name: p.name, segs: p.segs, broken: p.broken, kind: p.kind || 'land' });
   for (const b of S.buildings){ if (BUILD[b.type].inPen && !pens.has(b.pen)) continue; placeBuilding(b.type, b.i, b.j, { id: b.id, rot: b.rot, pal: b.pal }); }
   for (const d of S.dinos){ const pen = pens.get(d.pen); if (!pen) continue; spawnDino(d.sp, pen, { id: d.id, x: d.x, z: d.z, hunger: d.hunger, thirst: d.thirst ?? 0.2, sc: d.sc, pt: d.pt, name: d.name, fedSkip: d.fedSkip, state: d.state === 'holding' || penBroken(pen) ? 'holding' : 'pen' }); }
-  eggs = S.eggs || []; G.hour = Math.max(G.hour, DAY_START); if (!G.econ6){ G.econ6 = true; G.rep = Math.max(G.rep, 55); G.safety = Math.max(G.safety, 70); } migrateV9(); afterStructureChange(); return true;
+  eggs = S.eggs || []; G.hour = Math.max(G.hour, DAY_START); if (!G.econ6){ G.econ6 = true; G.rep = Math.max(G.rep, 55); G.safety = Math.max(G.safety, 70); } migrateV9();
+  G.mono.lines = G.mono.lines.filter(d => d.st.filter(Boolean).every(id => buildings.has(id))); monoRebuildAll(); migrateV10(); afterStructureChange(); return true;
 }
 
 /* ================= species thumbnails ================= */
@@ -2252,7 +2484,7 @@ function simulate(gdt){
   if (G.hour >= OPEN && G.hour < CLOSE){ G.spawnAcc = (G.spawnAcc || 0) + guestRatePerHour() * hourDt; while (G.spawnAcc >= 1){ G.spawnAcc--; ferryArrival(); } }
   updateFerries(gdt);
   for (const d of dinos.slice()) updateDino(d, gdt);
-  updateGuests(gdt, hourDt); updateEggs(gdt); updateJeeps(gdt); G.feedCooldown = Math.max(0, G.feedCooldown - gdt);
+  updateGuests(gdt, hourDt); updateMono(gdt); updateEggs(gdt); updateJeeps(gdt); G.feedCooldown = Math.max(0, G.feedCooldown - gdt);
   if (G.hour >= DAY_END) endDay();
 }
 function frame(now){
@@ -2277,19 +2509,27 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && G &
 window.addEventListener('pagehide', () => { if (G && G.running) saveGame(); });
 
 /* ================= debug / test hook ================= */
+const _sv10 = new THREE.Vector3(); function screenOfTile(i, j){ _sv10.set(tX(i), H(tX(i), tZ(j)), tZ(j)).project(camera); if (_sv10.z > 1 || Math.abs(_sv10.x) > 1 || Math.abs(_sv10.y) > 1) return null; return { x: (_sv10.x * 0.5 + 0.5) * innerWidth, y: (-_sv10.y * 0.5 + 0.5) * innerHeight }; }
 window.__DP = {
   get G(){ return G; }, get dinos(){ return dinos; }, get guests(){ return guests.filter(g => !g.gone); }, get pens(){ return [...pens.values()]; }, get buildings(){ return [...buildings.values()]; }, get perf(){ return { blood: bloodIM.count, fps: PERF.fps, cpu: PERF.cpu, q: QUALITY.level, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; },
   vegCounts(){ const o = {}; for (const k in VEG) o[k] = [VEG[k].items.length, VEG[k].ims[0].count]; return o; },
   cam, SPECIES, OFF, LO, HI, landCounts, buyExpansion, expandFree(){ G.expand = true; applyExpansion(); afterStructureChange(); }, start(fresh = true){ if (fresh) newGame(); G.tutorialDone = true; startPlaying(false); $('tut').classList.add('hidden'); },
   path(i0, j0, i1, j1){ paintLine([i0, j0], [i1, j1], false); afterStructureChange(); },
   pen(i0, j0, i1, j1, tier, kind = 'land'){ const c = penCanBuild(i0, j0, i1, j1, kind); if (!c.ok) return c.why; spend('build', penCost(i0, j0, i1, j1, tier, kind)); const p = createPen(i0, j0, i1, j1, tier, { kind }); afterStructureChange(); return p.id; },
-  build(type, i, j){ const c = canPlace(type, i, j); if (!c.ok) return c.why; spend('build', BUILD[type].cost); const b = placeBuilding(type, i, j); afterStructureChange(); return b.id; },
+  build(type, i, j){ const c = canPlace(type, i, j); if (!c.ok) return c.why; spend('build', bldCost(type, i, j)); const b = placeBuilding(type, i, j); afterStructureChange(); return b.id; },
   hatch(sp, penId, instant){ const pen = pens.get(penId); G.unlockAll = true; const ok = orderEgg(sp, pen); if (ok && instant){ const e = eggs.pop(); hatchEgg(e); } return ok; },
   spawnGuests(n){ for (let k = 0; k < n; k++){ const g = spawnGuest(); if (!g) break; g.state = 'walk'; const t = [...Array(GN * GN).keys()].filter(k => tileType[k] === T_PATH && exitDist[k] < 1e6); const k2 = t[(rnd() * t.length) | 0]; g.ci = kI(k2); g.cj = kJ(k2); g.x = tX(g.ci); g.z = tZ(g.cj); g.tx = g.x; g.tz = g.z; G.stats.guestsTotal++; G.stats.guestsToday++; earn('tickets', G.price); } },
   feed(penId){ return feedGuest(pens.get(penId)); }, breakout(dinoId){ const d = dinos.find(x => x.id === dinoId); breakout(d, pens.get(d.pen)); }, dispatch: dispatchRangers,
   repair(penId){ const pen = pens.get(penId); for (const s of pen.segs){ s.cond = 1; s.broken = false; } releaseHeld(pen); rebuildFences(); showAlert(); },
   focus: focusOn, openSheet, closeSheet, setSpeed(s){ G.speed = s; }, setHour(h){ G.hour = h; }, setQuality, sim(sec){ let t = sec; while (t > 0){ const s = Math.min(t, 0.05); simulate(s); updateWild(s); t -= s; this._vt = (this._vt || 0) + s; if (this._vt >= 1){ this._vt = 0; computeViewMap(); } } }, tick(){ updateCamera(0.05); applyLighting(); renderer.render(scene, camera); },
   v9: { H, H0, LAKES, lakeAt, tX, tZ, eX, penCanBuild, penCost, canPlace, huntPairs, predationOn, absHour, SHOP, serialize, saveGame, transferCheck: (id, pid) => transferCheck(dinos.find(d => d.id === id), pens.get(pid)), migrateV9, BLD_PALETTES: M.BLD_PALETTES, applyPalettes, bldMatFor, THUMBS: () => Object.keys(THUMBS) },
+  v10: { roughInfo(x, z){ roughInfo(x, z); return { rb: _rb, ri: _ri }; }, tileBase: () => tileBase, tileGrade: () => tileGrade, ridgeMask: () => ridgeMask, idx, kI, kJ, GATE, PADS, gradeCost, bldCost, pathTilesCost, isExpK, reachK, pcomp: () => pcomp, comps: () => ({ main: mainComp, reach: [...compReach], home: [...homeVia.entries()] }),
+    monoLine(stIds, pts = [], loop = false){ const sts = stIds.map(id => buildings.get(id)); if (sts.some(b => !b)) return 'no station'; const nodes = [[sts[0].x, sts[0].z], ...pts, ...sts.slice(1).map(b => [b.x, b.z])]; const st = [sts[0].id, ...pts.map(() => 0), ...sts.slice(1).map(b => b.id)];
+      const def = { id: G.nextId++, nodes, st, loop, cost: 0 }; let l = 0; for (let k = 1; k < nodes.length; k++) l += Math.hypot(nodes[k][0] - nodes[k - 1][0], nodes[k][1] - nodes[k - 1][1]); def.cost = Math.round(l * MONO_COST_M / 100) * 100; { const cr = Math.min(G.monoCredit || 0, def.cost); if (cr) G.monoCredit -= cr; spend('build', def.cost - cr); } monoDefs().push(def); monoBuildLine(def); afterStructureChange(); return def.id; },
+    lines: () => MONO.lines.map(L => ({ id: L.def.id, ok: L.ok, len: Math.round(L.path.len), stops: L.path.stops.map(s => s.bid), s: +L.train.s.toFixed(2), v: +L.train.v.toFixed(2), dwell: +L.train.dwell.toFixed(2), riders: L.train.riders.length, dist: Math.round(L.train.ds || 0), car: L.train.cars[1].getWorldPosition(new THREE.Vector3()).toArray().map(v => +v.toFixed(2)), tris: L.mesh.geometry.attributes.position.count / 3 })),
+    removeLine: (id) => monoRemoveLine(id, 0.5), monoAdvice, expansionCut: () => expansionCut().map(p => p.id), monoOperational, migrateV10, dartY: (id) => dartY(dinos.find(d => d.id === id)), dinoY: (id) => dinoY(dinos.find(d => d.id === id)), MONO_FARE, MONO_CREDIT, ringPaths(){ let n = 0; for (let k = 0; k < tileType.length; k++) if (tileType[k] === T_PATH && ridgeMask[k]) n++; return n; },
+    guestStates(){ const o = {}; for (const g of guests) if (!g.gone) o[g.state] = (o[g.state] || 0) + 1; return o; }, expGuests(){ return guests.filter(g => !g.gone && (g.state === 'walk' || g.state === 'leave') && isExpK(idx(g.ci, g.cj))).length; },
+    tileTypes: () => tileType, previewVisible: () => !!(monoPrev && monoPrev.visible), bulldoze(id){ const b = buildings.get(id); if (!b) return false; G.money += BUILD[b.type].cost * 0.5; removeBuilding(b); afterStructureChange(); return true; }, tileAt: (x, y) => tileAtScreen(x, y), toolTapTile(i, j){ const p = screenOfTile(i, j); if (p) toolTap(p); return !!p; } },
   hourly(){ hourTick(); }, ready: false,
   get tool(){ return tool; }, get camera(){ return camera; }, groundAt(x, y){ return groundAtScreen(x, y); }, get undo(){ return undoRec; }, startTool, undoLast, tutorial(k){ showTutorial(k); }, get penMarkers(){ return penMarkers.length; }, guestNeeds, get bubbles(){ return bubbles.filter(b => b.s.visible).length; }, get penSpots(){ return penSpots; }, get ferry(){ return { pendingIn: FERRY.pendingIn, boats: FERRY.boats.map(b => ({ kind: b.slot.kind, state: b.state, t: +b.t.toFixed(1), x: +b.slot.mesh.position.x.toFixed(1), z: +b.slot.mesh.position.z.toFixed(1) })), waiting: waitingAtDock() }; }, onPier, walkH, advisor(){ return moneyAdvisor(); }, guestSpread(){ const gx = tX(GATE.i) + TILE / 2, gz = tZ(GATE.j); const w = guests.filter(g => !g.gone && g.state === 'walk'); const d = w.map(g => Math.hypot(g.x - gx, g.z - gz)); const f = x => d.length ? +(d.filter(v => v > x).length / d.length).toFixed(2) : 0; return { walking: w.length, over30m: f(30), over60m: f(60), over100m: f(100), maxM: Math.round(Math.max(0, ...d)) }; }, penWarn(id){ const p = pens.get(id); return !!p && (!!penWeak(p) || penBroken(p) || penMinCond(p) < 0.45 || penWorn(p)); }, heightAt(x, z){ return H(x, z); }, dailyUpkeep, guestThought, pickGuest, screenOfXZ(x, y, z){ const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight]; }, transferCheck(dId, pId){ return transferCheck(dinos.find(d => d.id === dId), pens.get(pId)); }, startTransfer(dId){ startTransfer(dinos.find(d => d.id === dId)); }, get tutK(){ return tutK; }, flowPerMin(){ return flowPerMin(); }, stars(){ G.stars = computeStars(); checkMissions(); return G.stars; }, get fling(){ return { ...fling }; }, serialize(){ return serialize(); }, load(){ return loadGame(); }, save(){ saveGame(); }, screenOf(i, j){ const v = new THREE.Vector3(tX(i), H(tX(i), tZ(j)), tZ(j)).project(camera); return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight]; }, tileType(i, j){ return tileType[idx(i, j)]; },
   get v7(){ return { clip: cam.clip, curbs: curbIM.count, curbVis: curbIM.visible, grass: VEG.grass.ims[0].count, flower: VEG.flower.ims[0].count, shrub: VEG.shrub.ims[0].count, log: VEG.log.ims[0].count, guestHi: guestIM.geometry === GGEO[1], fenceHi: FENCE_IM[3].panel.geometry === FENCE_GEO[3][1].panel, bldHi: [...buildings.values()].every(b => b.mesh.userData.body.geometry === bldGeo(b.type, true)), camBoxes: CAM_BOX.length }; },
