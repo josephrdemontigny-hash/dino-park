@@ -25,7 +25,7 @@ const tX = i => (i + 0.5) * TILE - HALF, tZ = j => (j + 0.5) * TILE - HALF;
 const eX = i => i * TILE - HALF; // tile edge coordinate
 const toI = x => Math.floor((x + HALF) / TILE);
 // v9 bigger island: the build grid grows OFF tiles on every side (negative tile indices), so v8 tile coordinates, saves and the gate stay valid
-const OFF = 24, GN = GRID + 2 * OFF, LO = -OFF, HI = GRID + OFF, WHALF = GN * TILE / 2;
+const OFF = 80, GN = GRID + 2 * OFF, LO = -OFF, HI = GRID + OFF, WHALF = GN * TILE / 2; // v11: a much larger island; i,j of the original park are unchanged
 const inGrid = (i, j) => i >= LO && j >= LO && i < HI && j < HI;
 const kI = k => k % GN - OFF, kJ = k => ((k / GN) | 0) - OFF;
 const EXPAND_COST = 150000;
@@ -69,10 +69,10 @@ const WT = { para: 3, trike: 9, stego: 5, dilo: 0.4, ankylo: 6, raptor: 0.3, bra
 const DEFENSE = { ankylo: 0.6, trike: 0.55, stego: 0.45, brachio: 0.5, diplo: 0.5, theri: 0.45, pachy: 0.25, para: 0.1, galli: 0.05, sarco: 0.35, spino: 0.3, allo: 0.2, carno: 0.2, raptor: 0.15, dilo: 0.1, elasmo: 0.1, trex: 0.3 };
 const PACK = { raptor: 1.5, dilo: 0.8, allo: 0.6, carno: 0.3 };
 const PEN_KINDS = { land: { name: 'Standard', desc: 'Open ground for land animals.' }, aviary: { name: 'Aviary', desc: 'Netted dome for pterosaurs. A cheap or damaged aviary lets them out to swoop at guests.' },
-  lake: { name: 'Lake', desc: 'Fenced ground around a freshwater lake. For Spinosaurus and Sarcosuchus; land animals can share it. Needs 5 x 5 or more.' },
-  lagoon: { name: 'Ocean Lagoon', desc: 'Sea nets on open water near the shore, away from the ferry lane. For Mosasaurus and Elasmosaurus.' } };
+  lake: { name: 'Lake', desc: 'Fenced ground around a freshwater lake. For Spinosaurus and Sarcosuchus; land animals can share it. Needs 5 x 5 or more, and can only be built in the River Valley.' },
+  lagoon: { name: 'Ocean Lagoon', desc: 'Sea nets on open water of the Beach Coast, away from the ferry lane. For Mosasaurus and Elasmosaurus. Only on the Beach Coast.' } };
 const habOf = sp => SPECIES[sp].hab || 'land';
-function habOk(sp, pen){ const h = habOf(sp), k = pen.kind || 'land'; return h === 'land' ? (k === 'land' || k === 'lake') : h === k; }
+function habOk(sp, pen){ if (!pen) return false; const h = habOf(sp), k = pen.kind || 'land'; return h === 'land' ? (k === 'land' || k === 'lake') : h === k; }
 const HAB_NAME = { land: 'a standard or lake enclosure', aviary: 'an aviary', lake: 'a lake enclosure', lagoon: 'an ocean lagoon' };
 const BUILD = {
   path:     { name: 'Footpath', cost: 150, desc: 'Guests walk on paths. Tap point to point.', stars: 0 },
@@ -114,9 +114,9 @@ const QUALITY = { level: 2, forced: false, pr: [1, 1.5, 2], shadow: [1024, 1536,
 if (QS.has('q')){ QUALITY.level = clamp(parseInt(QS.get('q')) || 0, 0, 2); QUALITY.forced = true; }
 const MAX_ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 2400); setDinoCamera(camera);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.5, 5000); setDinoCamera(camera);
 const FOG_COL = new THREE.Color(0xbfd0c8);
-scene.fog = new THREE.FogExp2(FOG_COL.clone(), 0.0016);
+scene.fog = new THREE.FogExp2(FOG_COL.clone(), 0.00115);
 const hemi = new THREE.HemisphereLight(0xd4e4ff, 0x4d4630, 0.95); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff0d6, 3.1); sun.castShadow = true; scene.add(sun); scene.add(sun.target);
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.4; sun.shadow.camera.near = 1; sun.shadow.camera.far = 600;
@@ -181,6 +181,7 @@ function Hgen(x, z, nw){
   if (vd < VOLC.r){ const k = 1 - vd / VOLC.r; let c = VOLC.h * Math.pow(k, 1.7) * (0.82 + 0.36 * fbm(x * 0.03, z * 0.03)); if (vd < 13) c -= (13 - vd) * 1.6; h = Math.max(h, c - 1.5 + land * 0); }
   // ridges on west/east rims beyond the plot
   if (!nw){ const rim = Math.max(Math.abs(x) - 118, 0); if (rim > 0) h += rim * 0.25 * fbm(x * 0.05, z * 0.05) * land; }
+  if (nw) h = addV11Land(h, x, z);
   return h;
 }
 // v10: a rocky ridge rings the original park (paths cannot cross it, only the monorail), then broken hills, terraced cliffs and ravines out to the new coast
@@ -204,6 +205,55 @@ function roughAdd(x, z, land){ roughInfo(x, z); let a = 0;
     const rv = Math.abs(fbm(x * 0.008 + 5, z * 0.008 + 9) - 0.5); b -= sstep(0.045, 0, rv) * (b + 4); // ravines
     a += _ri * land * b; }
   return a; }
+
+/* ---------- v11: distant landmasses beyond the v10 coast, joined by forested isthmuses.
+   Existing park and highland heights are left alone (blend starts past coastR9). ---------- */
+const VOLC2 = { x: 40, z: -400, r: 190, h: 200 };
+function lobeN(x, z, cx, cz, rx, rz){ return 1 - Math.hypot((x - cx) / rx, (z - cz) / rz); }
+function distSeg(x, z, ax, az, bx, bz){ const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1; const t = clamp(((x - ax) * dx + (z - az) * dz) / l2, 0, 1); return Math.hypot(x - ax - dx * t, z - az - dz * t); }
+function riverDist(x, z){ let d = 1e9; const pts = [[-250, -20], [-300, 0], [-360, -40], [-390, -100], [-370, -160], [-400, -200]];
+  for (let i = 0; i < pts.length - 1; i++){ const w = 10 * Math.sin(x * 0.04 + i); d = Math.min(d, distSeg(x, z, pts[i][0], pts[i][1] + w, pts[i + 1][0], pts[i + 1][1])); } return d; }
+const APPR_SEGS = [
+  [-100, 78, -160, 86], [-160, 86, -260, 78], [-260, 78, -330, 10], [-330, 10, -350, -30],
+  [130, -90, 230, -90], [230, -90, 260, -180], [260, -180, 300, -240],
+  [230, -180, 180, -260], [180, -260, 80, -280], [80, -280, 50, -340],
+  [120, 82, 240, 60], [240, 60, 300, 40]
+];
+function apprDist(x, z){ let d = 1e9; for (const S of APPR_SEGS) d = Math.min(d, distSeg(x, z, S[0], S[1], S[2], S[3])); return d; }
+let USE_APPR = true;
+function addV11Land(h, x, z){
+  const d0 = Math.hypot(x, z * 0.96), R = coastR9(x, z); let add = -99;
+  const b = lobeN(x, z, 350, 40, 175, 155); if (b > 0) add = Math.max(add, (1.3 + 2 * fbm(x * 0.02, z * 0.02) + 1.4 * b) * sstep(0, 0.22, b));
+  const ithB = distSeg(x, z, 200, 30, 290, 40); if (ithB < 34) add = Math.max(add, lerp(2.5, -0.4, ithB / 34) + 0.3 * fbm(x * 0.04, z * 0.04));
+  const v = lobeN(x, z, -350, -30, 180, 190);
+  if (v > 0){ let vh = (3.2 + 4 * fbm(x * 0.015, z * 0.015) + 2 * v) * sstep(0, 0.2, v); const rd = riverDist(x, z); if (rd < 18) vh = lerp(vh, -1.6 - 0.4 * (1 - rd / 18), sstep(18, 5, rd)); add = Math.max(add, vh); }
+  const ithV = distSeg(x, z, -210, -5, -290, -20); if (ithV < 36) add = Math.max(add, lerp(3.2, -0.4, ithV / 36));
+  const jn = lobeN(x, z, 300, -260, 165, 155);
+  if (jn > 0){ let jh = (2.6 + 3 * fbm(x * 0.02, z * 0.02)) * sstep(0, 0.2, jn); const sw = fbm(x * 0.03 + 9, z * 0.03 + 2); if (sw < 0.34 && jn > 0.12) jh -= (0.34 - sw) * 7; add = Math.max(add, jh); }
+  const ithJ = distSeg(x, z, 165, -80, 250, -200); if (ithJ < 34) add = Math.max(add, lerp(3.2, -0.4, ithJ / 34));
+  const va = lobeN(x, z, 40, -380, 200, 170); if (va > 0) add = Math.max(add, (4 + 6 * fbm(x * 0.015, z * 0.015)) * sstep(0, 0.2, va));
+  const vd2 = Math.hypot(x - VOLC2.x, z - VOLC2.z);
+  if (vd2 < VOLC2.r){ const k = 1 - vd2 / VOLC2.r; let c = VOLC2.h * Math.pow(k, 1.55) * (0.85 + 0.3 * fbm(x * 0.025, z * 0.025)); if (vd2 < 20) c -= (20 - vd2) * 2.4; add = Math.max(add, c); }
+  const ithU = distSeg(x, z, 80, -240, 50, -330); if (ithU < 44) add = Math.max(add, lerp(8, -0.4, ithU / 44) + 3 * fbm(x * 0.02, z * 0.02));
+  // far scenic ranges (visual only, mostly past the build grid) so the horizon never looks empty
+  const far = sstep(480, 700, d0) * (8 + 28 * fbm(x * 0.006 + 4, z * 0.006 + 2)); if (far > 0 && z < -200) add = Math.max(add, far);
+  if (add > -90){ const target = Math.max(h, add), core = sstep(R + 8, R + 60, d0), cor = (ithB < 42 || ithV < 44 || ithJ < 42 || ithU < 54) ? 1 : core;
+    h = lerp(h, target, Math.max(core, cor * 0.9)); }
+  if (USE_APPR){ const ad = apprDist(x, z); if (ad < 22 && h < 0.5) h = Math.max(h, lerp(1.5, 0.15, ad / 22)); }
+  return h;
+}
+function regionAt(x, z){
+  const d = Math.hypot(x, z * 0.96), R9 = coastR9(x, z);
+  if (d < R9 + 8){
+    if (H0(x, z) >= 0.55 && d < coastR(x, z) + 8) return 'plains';
+    if (Hgen(x, z, true) > 0.4) return 'highland';
+  }
+  if (lobeN(x, z, 40, -380, 200, 170) > 0 || distSeg(x, z, 80, -240, 50, -330) < 44 || Math.hypot(x - VOLC2.x, z - VOLC2.z) < VOLC2.r + 10) return 'volcano';
+  if (lobeN(x, z, 350, 40, 175, 155) > 0 || distSeg(x, z, 200, 30, 290, 40) < 36) return 'beach';
+  if (lobeN(x, z, -350, -30, 180, 190) > 0 || distSeg(x, z, -210, -5, -290, -20) < 38) return 'valley';
+  if (lobeN(x, z, 300, -260, 165, 155) > 0 || distSeg(x, z, 165, -80, 250, -200) < 36) return 'jungle';
+  return 'sea';
+}
 const TERR = { cx: 0, cz: -70, size: 560, seg: 220 };
 const terrGeo = new THREE.PlaneGeometry(TERR.size, TERR.size, TERR.seg, TERR.seg); terrGeo.rotateX(-Math.PI / 2); terrGeo.translate(TERR.cx, 0, TERR.cz);
 {
@@ -213,16 +263,20 @@ const terrGeo = new THREE.PlaneGeometry(TERR.size, TERR.size, TERR.seg, TERR.seg
   for (let i = 0; i < n; i++) splatAt(i, p, nr, splat); terrGeo.setAttribute('splat', new THREE.BufferAttribute(splat, 4));
 }
 function splatAt(i, p, nr, splat){ { const x = p.getX(i), z = p.getZ(i), h = p.getY(i), ny = nr.getY(i);
-    const sand = sstep(0.95, 0.3, h); const rock = clamp(sstep(0.86, 0.7, ny) + sstep(26, 40, h) * 0.8, 0, 1);
-    const dirt = clamp((fbm(x * 0.05 + 11, z * 0.05 + 3) - 0.56) * 4, 0, 0.8) * (1 - sand) * (1 - rock) + sstep(14, 22, h) * 0.5 * (1 - rock);
+    const biome = regionAt(x, z);
+    let sand = sstep(0.95, 0.3, h); const rock0 = clamp(sstep(0.86, 0.7, ny) + sstep(26, 40, h) * 0.8, 0, 1);
+    let rock = rock0; if (biome === 'beach') sand = clamp(sand + sstep(4, 0.4, h) * 0.75, 0, 1); if (biome === 'volcano') rock = clamp(rock + 0.55 + sstep(40, 80, h) * 0.4, 0, 1);
+    if (biome === 'jungle') sand *= 0.3;
+    const dirt = clamp((fbm(x * 0.05 + 11, z * 0.05 + 3) - 0.56) * 4, 0, 0.8) * (1 - sand) * (1 - rock) + sstep(14, 22, h) * 0.5 * (1 - rock) + (biome === 'jungle' ? 0.15 : 0) + (biome === 'valley' && riverDist(x, z) < 22 ? 0.2 : 0);
     let grass = Math.max(0, 1 - sand - rock - dirt);
     const s = grass + dirt + sand + rock || 1; splat[i*4] = grass / s; splat[i*4+1] = dirt / s; splat[i*4+2] = sand / s; splat[i*4+3] = rock / s; } }
 // v9: re-shape the terrain under a lake basin (dug or filled back in)
-function retopo(x0, z0, x1, z1){ const p = terrGeo.attributes.position, sp = terrGeo.attributes.splat; let any = false;
+function retopoMesh(mesh, x0, z0, x1, z1){ const p = mesh.geometry.attributes.position, sp = mesh.geometry.attributes.splat; if (!p) return; let any = false;
   for (let i = 0; i < p.count; i++){ const x = p.getX(i), z = p.getZ(i); if (x < x0 - 4 || x > x1 + 4 || z < z0 - 4 || z > z1 + 4) continue; p.setY(i, H(x, z)); any = true; }
-  if (!any) return; terrGeo.computeVertexNormals(); const nr = terrGeo.attributes.normal;
-  for (let i = 0; i < p.count; i++){ const x = p.getX(i), z = p.getZ(i); if (x < x0 - 4 || x > x1 + 4 || z < z0 - 4 || z > z1 + 4) continue; splatAt(i, p, nr, sp.array); }
-  p.needsUpdate = true; sp.needsUpdate = true; terrGeo.attributes.normal.needsUpdate = true; }
+  if (!any) return; mesh.geometry.computeVertexNormals(); const nr = mesh.geometry.attributes.normal;
+  if (sp) for (let i = 0; i < p.count; i++){ const x = p.getX(i), z = p.getZ(i); if (x < x0 - 4 || x > x1 + 4 || z < z0 - 4 || z > z1 + 4) continue; splatAt(i, p, nr, sp.array); sp.needsUpdate = true; }
+  p.needsUpdate = true; mesh.geometry.attributes.normal.needsUpdate = true; }
+function retopo(x0, z0, x1, z1){ retopoMesh(terrain, x0, z0, x1, z1); if (typeof terrFar !== 'undefined' && terrFar) retopoMesh(terrFar, x0, z0, x1, z1); for (const m of terrPatches) retopoMesh(m, x0, z0, x1, z1); }
 // path / pen mask (canvas covering the build grid)
 const MASK_N = 1024; const maskCanvas = M.mk(MASK_N, MASK_N); const maskCtx = maskCanvas.getContext('2d');
 const maskTex = new THREE.CanvasTexture(maskCanvas); maskTex.colorSpace = THREE.NoColorSpace; maskTex.flipY = false; maskTex.minFilter = THREE.LinearMipmapLinearFilter; maskTex.magFilter = THREE.LinearFilter;
@@ -252,6 +306,25 @@ terrMat.onBeforeCompile = (sh) => { Object.assign(sh.uniforms, TU);
 };
 terrMat.customProgramCacheKey = () => 'terrain7';
 const terrain = new THREE.Mesh(terrGeo, terrMat); terrain.receiveShadow = true; scene.add(terrain);
+const terrPatches = [];
+function fillTerrGeo(geo){ const p = geo.attributes.position, n = p.count, splat = new Float32Array(n * 4), uv = geo.attributes.uv;
+  for (let i = 0; i < n; i++){ const x = p.getX(i), z = p.getZ(i); p.setY(i, H(x, z)); uv.setXY(i, x / 7, z / 7); }
+  geo.computeVertexNormals(); const nr = geo.attributes.normal; for (let i = 0; i < n; i++) splatAt(i, p, nr, splat); geo.setAttribute('splat', new THREE.BufferAttribute(splat, 4)); return geo; }
+const terrFarMat = terrMat.clone();
+terrFarMat.onBeforeCompile = (sh) => {
+  terrMat.onBeforeCompile(sh);
+  const coreR = 'length(vWP.xz - vec2(' + TERR.cx.toFixed(1) + ', ' + TERR.cz.toFixed(1) + '))';
+  const fadeCode = '  float core = ' + coreR + '; if (core < 255.0) discard; float fade = smoothstep(255.0, 290.0, core); gl_FragColor.a *= fade;\n  ';
+  sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>', fadeCode + '#include <dithering_fragment>');
+};
+terrFarMat.customProgramCacheKey = () => 'terrain7far';
+terrFarMat.transparent = true;
+const TERR_FAR = { cx: 0, cz: -180, size: 1800, seg: 72 };
+const terrFarGeo = fillTerrGeo(new THREE.PlaneGeometry(TERR_FAR.size, TERR_FAR.size, TERR_FAR.seg, TERR_FAR.seg).rotateX(-Math.PI / 2).translate(TERR_FAR.cx, 0, TERR_FAR.cz));
+const terrFar = new THREE.Mesh(terrFarGeo, terrFarMat); terrFar.receiveShadow = false; terrFar.castShadow = false; terrFar.renderOrder = -1; scene.add(terrFar);
+function makeTerrPatch(x0, z0, x1, z1, step = 4){ const w = x1 - x0, d = z1 - z0, sx = Math.max(8, Math.round(w / step)), sz = Math.max(8, Math.round(d / step));
+  const g = fillTerrGeo(new THREE.PlaneGeometry(w, d, sx, sz).rotateX(-Math.PI / 2).translate((x0 + x1) / 2, 0, (z0 + z1) / 2));
+  const m = new THREE.Mesh(g, terrMat); m.receiveShadow = true; m.userData.patch = true; scene.add(m); terrPatches.push(m); return m; }
 
 /* ================= water ================= */
 const waterMat = new THREE.MeshStandardMaterial({ color: 0x1b4a4a, roughness: 0.08, metalness: 0.0, transparent: true, opacity: 0.84, normalMap: TEX.water, normalScale: new THREE.Vector2(0.28, 0.28), envMapIntensity: 1.1 });
@@ -261,8 +334,14 @@ const water = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.P
 // volcano smoke
 const smokeMat = new THREE.SpriteMaterial({ map: TEX.soft, color: 0xb8b4ac, transparent: true, opacity: 0.35, depthWrite: false, fog: true });
 const smoke = []; for (let i = 0; i < 14; i++){ const s = new THREE.Sprite(smokeMat.clone()); s.userData.t = i / 14; scene.add(s); smoke.push(s); }
-function updateSmoke(dt){ const top = H(VOLC.x, VOLC.z) + 8; for (const s of smoke){ s.userData.t = (s.userData.t + dt * 0.02) % 1; const t = s.userData.t;
-  s.position.set(VOLC.x + t * 40 + Math.sin(t * 6 + s.id) * 4, top + t * 70, VOLC.z + t * 18); const sc = 14 + t * 60; s.scale.set(sc, sc, 1); s.material.opacity = Math.sin(t * Math.PI) * 0.32; } }
+function updateSmoke(dt){ const top = H(VOLC2.x, VOLC2.z) + 10, top0 = H(VOLC.x, VOLC.z) + 8;
+  for (let i = 0; i < smoke.length; i++){ const s = smoke[i]; s.userData.t = (s.userData.t + dt * (i < 4 ? 0.015 : 0.02)) % 1; const t = s.userData.t;
+    if (i < 4){ s.position.set(VOLC.x + t * 28 + Math.sin(t * 6 + i) * 3, top0 + t * 50, VOLC.z + t * 12); const sc = 10 + t * 40; s.scale.set(sc, sc, 1); s.material.opacity = Math.sin(t * Math.PI) * 0.22; s.material.color.setHex(0xb8b4ac); }
+    else { s.position.set(VOLC2.x + t * 50 + Math.sin(t * 5 + i) * 6, top + t * 90, VOLC2.z + t * 20); const sc = 18 + t * 80; s.scale.set(sc, sc, 1); s.material.opacity = Math.sin(t * Math.PI) * 0.38; s.material.color.setHex(0xc8b4a0); } } }
+const lavaMat = new THREE.MeshBasicMaterial({ color: 0xff6a18, fog: true, transparent: true, opacity: 0.85 });
+{ const lava = new THREE.Mesh(new THREE.CircleGeometry(16, 20).rotateX(-Math.PI / 2), lavaMat); lava.position.set(VOLC2.x, 0, VOLC2.z); lava.userData.lava = true; scene.add(lava);
+  const glow = new THREE.PointLight(0xff5510, 4, 180, 1.6); glow.position.set(VOLC2.x, 40, VOLC2.z); scene.add(glow);
+  const _lv = lava; (function placeLava(){ _lv.position.y = H(VOLC2.x, VOLC2.z) + 1.2; })(); }
 
 /* ================= vegetation ================= */
 const leafMat = M.windify(new THREE.MeshStandardMaterial({ map: TEX.leaf, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true, roughness: 0.85, color: 0xb8c890 }), 0.018, 6);
@@ -364,7 +443,7 @@ let G = null;
 function freshState(){ return { v: 1, econ6: true, money: 300000, day: 1, hour: OPEN - 0.5, price: 35, rep: 55, safety: 85, stars: 0, speed: 1, nextId: 1,
   ledger: { tickets: 0, shops: 0, upkeep: 0, feed: 0, build: 0, hatch: 0, fines: 0, other: 0 }, prevLedger: null,
   stats: { guestsTotal: 0, guestsToday: 0, deaths: 0, fed: 0, breakouts: 0, hatched: 0, carnHatched: 0, bestProfit: -1e9, trex: 0 },
-  missions: [], thrill: 0, tutorialDone: false, feedCooldown: 0, v9: true, v10: true, bldPal: 'classic', spScheme: {}, mono: { lines: [] } }; }
+  missions: [], thrill: 0, tutorialDone: false, feedCooldown: 0, v9: true, v10: true, v11: true, bldPal: 'classic', spScheme: {}, mono: { lines: [] }, regions: { plains: true, beach: false, valley: false, highland: false, jungle: false, volcano: false } }; }
 const GATE = { i: 27, j: 53 };
 const LOCK_WHY = 'New land: buy the Expansion permit in Park first';
 let buildableCache = null;
@@ -372,25 +451,365 @@ function computeBuildable(){
   if (buildableCache){ tileType.set(buildableCache); return; }
   const test = (i, j, h, maxH) => { const x0 = eX(i), z0 = eX(j), hs = [h(x0, z0), h(x0 + TILE, z0), h(x0, z0 + TILE), h(x0 + TILE, z0 + TILE), h(x0 + 2, z0 + 2)];
     const mn = Math.min(...hs), mx = Math.max(...hs); return { ok: !(mn < 0.55 || mx > maxH || mx - mn > 1.9), c: hs[4], mn, mx }; };
-  tileGrade.fill(0);
+  tileGrade.fill(0); tileReg.fill(0); tileLand.fill(0);
   for (let j = LO; j < HI; j++) for (let i = LO; i < HI; i++){ const k = idx(i, j);
+    const x = tX(i), z = tZ(j), reg = regionAt(x, z); tileReg[k] = REG_CODE[reg] || 0;
     const old = i >= 0 && j >= 0 && i < GRID && j < GRID && test(i, j, H0, 7).ok; const n = test(i, j, H, 40); tileH[k] = n.c; let t = old ? T_EMPTY : T_BLOCK;
-    // v10 new land is rough but buildable (grading costs extra); cliffs and the border ridge are not
-    if (!old && j < GRID && n.mn >= 0.55 && n.mx <= 40 && n.mx - n.mn <= 6){ roughInfo(eX(i) + 2, eX(j) + 2); if (_rb <= 0.12){ t = T_LOCK; tileGrade[k] = n.mx - n.mn; } }
+    if (old) tileReg[k] = 1;
+    else if (i >= V10_LO && j >= V10_LO && i < V10_HI && j < V10_HI && j < GRID){
+      // T_LOCK is the v10 highland only, using heights without the v11 approach spits so landCounts stay stable
+      const prev = USE_APPR; USE_APPR = false; const n0 = test(i, j, H, 40); USE_APPR = prev;
+      if (n0.mn >= 0.55 && n0.mx <= 40 && n0.mx - n0.mn <= 6){ roughInfo(eX(i) + 2, eX(j) + 2); if (_rb <= 0.12){ t = T_LOCK; tileGrade[k] = n0.mx - n0.mn; tileReg[k] = 2; } }
+    }
+    if (t !== T_LOCK && t !== T_EMPTY && (reg === 'beach' || reg === 'valley' || reg === 'jungle' || reg === 'volcano') && n.mn >= 0.4 && n.mx <= 90){ tileLand[k] = 1; if (!tileGrade[k]) tileGrade[k] = n.mx - n.mn; }
     tileType[k] = t; }
-  // the old park and the expansion never touch: a ring of rough ground always separates them, so footpaths cannot cross (the monorail can)
+  // the old park and the highland never touch: a ring of rough ground always separates them, so footpaths cannot cross (the monorail can)
   const ring = []; for (let j = LO; j < HI; j++) for (let i = LO; i < HI; i++){ const k = idx(i, j); if (tileType[k] !== T_LOCK) continue;
     let adj = false; for (let dj = -1; dj <= 1 && !adj; dj++) for (let di = -1; di <= 1; di++){ if (inGrid(i + di, j + dj) && tileType[idx(i + di, j + dj)] === T_EMPTY){ adj = true; break; } } if (adj) ring.push(k); }
   ridgeMask.fill(0); for (const k of ring){ tileType[k] = T_BLOCK; tileGrade[k] = 0; ridgeMask[k] = 1; }
   for (let j = LO; j < GRID; j++) for (let i = LO; i < HI; i++){ const k = idx(i, j); if (tileType[k] !== T_BLOCK || ridgeMask[k]) continue; roughInfo(eX(i) + 2, eX(j) + 2); if (_rb > 0.12 && tileH[k] > 0.55) ridgeMask[k] = 1; }
+  markForestAndOpenings();
   buildableCache = tileType.slice(); tileBase.set(buildableCache);
 }
 // the expansion permit opens every T_LOCK tile; old parks keep their layout and gain the new land
-function applyExpansion(){ if (!G || !G.expand) return; for (let k = 0; k < tileType.length; k++) if (tileType[k] === T_LOCK) tileType[k] = T_EMPTY; }
+function applyExpansion(){ if (!G || !G.expand) return; for (let k = 0; k < tileType.length; k++) if (tileType[k] === T_LOCK) tileType[k] = T_EMPTY; if (!G.regions) G.regions = emptyRegions(); G.regions.highland = true; }
 function landCounts(){ let open = 0, locked = 0, old = 0; for (let k = 0; k < tileBase.length; k++){ if (tileBase[k] === T_EMPTY) old++; if (tileBase[k] === T_LOCK) locked++; } return { old, locked, total: old + locked }; }
 // v10 grading: levelling rough expansion ground costs extra, per metre of relief on each tile
 const GRADE = { path: 60, bld: 1400, pen: 90 };
 const isExpK = k => tileBase[k] === T_LOCK;
+/* ---------- v11 regions: unlockable land beyond a forest wall ---------- */
+const V10_LO = -24, V10_HI = 80;
+const REG_CODE = { sea: 0, plains: 1, highland: 2, beach: 3, valley: 4, jungle: 5, volcano: 6 };
+const REG_NAME = ['sea', 'plains', 'highland', 'beach', 'valley', 'jungle', 'volcano'];
+const REG_IDS = ['plains', 'beach', 'valley', 'highland', 'jungle', 'volcano'];
+const REGIONS = {
+  plains:   { id: 'plains', name: 'Main Plains', cost: 0, stars: 0, special: 'Your starting park: open grassland around the gate and pier.', mark: [0, 20], bb: [-140, -140, 140, 160] },
+  beach:    { id: 'beach', name: 'Beach Coast', cost: 80000, stars: 1, special: 'Sand, shallows and coves. Ocean lagoons and beach stands can only be built here. A ferry dock welcomes guests.', mark: [350, 40], bb: [180, -140, 540, 220] },
+  valley:   { id: 'valley', name: 'River Valley', cost: 120000, stars: 2, special: 'A winding river and lakes. Freshwater lake enclosures can only be built here (or along the river).', mark: [-350, -30], bb: [-540, -240, -160, 180] },
+  highland: { id: 'highland', name: 'Highland Ridge', cost: EXPAND_COST, stars: 2, special: 'Rough hills beyond a rocky ridge. Guests need the monorail to reach exhibits here.', mark: [0, -160], bb: [-220, -220, 220, 80], mono: true },
+  jungle:   { id: 'jungle', name: 'Deep Jungle', cost: 220000, stars: 3, special: 'Dense forest and swamp. Raptors and Dilophosaurus thrive here.', mark: [300, -260], bb: [140, -430, 500, -80] },
+  volcano:  { id: 'volcano', name: 'The Volcano', cost: 400000, stars: 3.5, special: 'A smoking peak of dark rock and safe lava glow. Exhibits here have the highest appeal.', mark: [40, -400], bb: [-180, -540, 260, -220] }
+};
+const tileReg = new Uint8Array(GN * GN);
+const tileLand = new Uint8Array(GN * GN); // 1 = region land, 2 = forest wall, 3 = cleared opening
+const REGOPEN = { paths: {}, dock: null };
+const emptyRegions = () => ({ plains: true, beach: false, valley: false, highland: false, jungle: false, volcano: false });
+function regionOpen(id){ if (id === 'plains' || id === 'sea') return true; return !!(G && G.regions && G.regions[id]); }
+function regNameAt(i, j){ return inGrid(i, j) ? (REG_NAME[tileReg[idx(i, j)]] || 'sea') : 'sea'; }
+function regionCore(id, x, z){
+  if (id === 'beach') return lobeN(x, z, 350, 40, 175, 155) > 0.08;
+  if (id === 'valley') return lobeN(x, z, -350, -30, 180, 190) > 0.08;
+  if (id === 'jungle') return lobeN(x, z, 300, -260, 165, 155) > 0.08;
+  if (id === 'volcano') return lobeN(x, z, 40, -380, 200, 170) > 0.05 || Math.hypot(x - VOLC2.x, z - VOLC2.z) < VOLC2.r + 8;
+  if (id === 'highland') return regionAt(x, z) === 'highland';
+  if (id === 'plains') return regionAt(x, z) === 'plains';
+  return false;
+}
+function lockWhyAt(i, j){
+  if (!inGrid(i, j)) return 'Outside the park';
+  const k = idx(i, j), t = tileType[k], r = REG_NAME[tileReg[k]];
+  if (t === T_LOCK) return LOCK_WHY;
+  if (tileLand[k] === 2 && !regionOpen(r === 'plains' || r === 'highland' || r === 'sea' ? nearestLocked(i, j) : r)) return 'Thick forest. Unlock a neighbouring region in Park to clear a path.';
+  if (r && r !== 'plains' && r !== 'sea' && r !== 'highland' && !regionOpen(r)) return `${REGIONS[r].name} is locked. Buy the land permit in Park.`;
+  if (r === 'highland' && !regionOpen('highland')) return LOCK_WHY;
+  return t === T_BLOCK ? 'Ground too rough' : 'Tile is occupied';
+}
+function nearestLocked(i, j){
+  let best = 'beach', bd = 1e9;
+  for (const id of ['beach', 'valley', 'jungle', 'volcano']){ if (regionOpen(id)) continue; const m = REGIONS[id].mark; const d = Math.hypot(tX(i) - m[0], tZ(j) - m[1]); if (d < bd){ bd = d; best = id; } }
+  return best;
+}
+function walkOpen(i, j){
+  if (!inGrid(i, j)) return false;
+  const t = tileType[idx(i, j)];
+  if (t === T_LOCK || t === T_EMPTY) return false;
+  const h = H(tX(i), tZ(j));
+  return h > 0.35 && h < 80;
+}
+function findOpening(reg){
+  const starts = [], goalSet = new Set();
+  for (let j = LO; j < HI; j++) for (let i = LO; i < HI; i++){
+    const k = idx(i, j);
+    if (tileType[k] === T_EMPTY && tileReg[k] === 1){
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){
+        const ii = i + di, jj = j + dj; if (!walkOpen(ii, jj)) continue;
+        let nearLock = false;
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (inGrid(ii + a, jj + b) && tileType[idx(ii + a, jj + b)] === T_LOCK) nearLock = true;
+        if (!nearLock) starts.push([ii, jj]);
+      }
+    }
+    if (tileReg[k] === REG_CODE[reg] && walkOpen(i, j)) goalSet.add(k);
+  }
+  const seen = new Int32Array(GN * GN).fill(-1), q = [];
+  for (const [i, j] of starts){ const k = idx(i, j); if (seen[k] !== -1) continue; seen[k] = -2; q.push(k); }
+  let hit = -1;
+  for (let h = 0; h < q.length; h++){
+    const k = q[h]; if (goalSet.has(k)){ hit = k; break; }
+    const i = kI(k), j = kJ(k);
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){
+      const ii = i + di, jj = j + dj; if (!walkOpen(ii, jj)) continue;
+      const kk = idx(ii, jj); if (seen[kk] !== -1) continue; seen[kk] = k; q.push(kk);
+    }
+  }
+  if (hit < 0) return [];
+  const path = [];
+  for (let k = hit; k !== -2; k = seen[k]){ path.push([kI(k), kJ(k)]); if (seen[k] < 0) break; }
+  path.reverse();
+  return path;
+}
+function markForestAndOpenings(){
+  REGOPEN.paths = {};
+  for (const id of ['beach', 'valley', 'jungle', 'volcano']) REGOPEN.paths[id] = findOpening(id);
+  // forest wall: approaches, opening corridors, and a ring just outside the plains
+  for (let j = LO; j < HI; j++) for (let i = LO; i < HI; i++){
+    const k = idx(i, j); if (tileType[k] === T_EMPTY || tileType[k] === T_LOCK) continue;
+    const x = tX(i), z = tZ(j); if (H(x, z) < 0.4) continue;
+    if (apprDist(x, z) < 36) tileLand[k] = Math.max(tileLand[k], 2);
+    let nearP = false;
+    for (let dj = -2; dj <= 2 && !nearP; dj++) for (let di = -2; di <= 2; di++) if (inGrid(i + di, j + dj) && tileType[idx(i + di, j + dj)] === T_EMPTY && tileReg[idx(i + di, j + dj)] === 1) nearP = true;
+    if (nearP) tileLand[k] = 2;
+  }
+  for (const id of Object.keys(REGOPEN.paths)) for (const [i, j] of REGOPEN.paths[id]){
+    for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) if (inGrid(i + di, j + dj)){
+      const k = idx(i + di, j + dj);
+      if (tileType[k] !== T_LOCK && tileType[k] !== T_EMPTY && H(tX(i + di), tZ(j + dj)) > 0.35) tileLand[k] = Math.max(tileLand[k], 2);
+    }
+  }
+}
+function applyOpening(id){
+  if (id === 'highland' || id === 'plains') return;
+  const path = REGOPEN.paths[id] || (REGOPEN.paths[id] = findOpening(id));
+  for (const [i, j] of path){
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++){
+      const ii = i + di, jj = j + dj; if (!inGrid(ii, jj)) continue;
+      const k = idx(ii, jj);
+      if (tileType[k] === T_LOCK || tileBase[k] === T_LOCK) continue;
+      if (tileType[k] === T_BLOCK || tileType[k] === T_EMPTY){ tileType[k] = (di === 0 && dj === 0) ? T_PATH : T_EMPTY; tileLand[k] = 3; }
+    }
+  }
+  // paint a 1-tile path down the centre so guests can walk in
+  for (const [i, j] of path){ const k = idx(i, j); if (tileType[k] === T_EMPTY || tileType[k] === T_PATH){ tileType[k] = T_PATH; tileLand[k] = 3; } }
+  if (path.length){ linkOpeningToPark(path[0][0], path[0][1]);
+    const R = REGIONS[id], end = path[path.length - 1];
+    if (R && R.mark) extendPathToward(end[0], end[1], R.mark[0], R.mark[1], 40); }
+}
+function extendPathToward(i, j, x1, z1, maxN){
+  let ci = i, cj = j;
+  for (let n = 0; n < maxN; n++){
+    const tx = tX(ci), tz = tZ(cj);
+    let best = null, bd = Math.hypot(tx - x1, tz - z1);
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]){
+      const ii = ci + di, jj = cj + dj; if (!inGrid(ii, jj)) continue;
+      const k = idx(ii, jj); if (tileBase[k] === T_LOCK || ridgeMask[k]) continue;
+      const t = tileType[k]; if (t !== T_EMPTY && t !== T_PATH) continue;
+      const d = Math.hypot(tX(ii) - x1, tZ(jj) - z1); if (d < bd - 0.2){ bd = d; best = [ii, jj]; }
+    }
+    if (!best) break;
+    ci = best[0]; cj = best[1];
+    if (tileType[idx(ci, cj)] === T_EMPTY) tileType[idx(ci, cj)] = T_PATH;
+    if (bd < 8) break;
+  }
+}
+function linkOpeningToPark(i, j){
+  const start = idx(i, j);
+  // stay on the rim of the original park so the path does not cut through the starting exhibits
+  const costAt = (ii, jj) => (ii >= 2 && ii <= 53 && jj >= 2 && jj <= 42) ? 80 : 1;
+  const dist = new Int32Array(GN * GN).fill(1e9), seen = new Int32Array(GN * GN).fill(-1);
+  const q = [start]; dist[start] = 0; seen[start] = -2;
+  let hit = -1, hitD = 1e9;
+  for (let h = 0; h < q.length; h++){
+    const k = q[h], ci = kI(k), cj = kJ(k);
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){
+      const ii = ci + di, jj = cj + dj; if (!inGrid(ii, jj)) continue;
+      const kk = idx(ii, jj); if (tileBase[kk] === T_LOCK || ridgeMask[kk]) continue;
+      const t = tileType[kk]; if (t !== T_EMPTY && t !== T_PATH) continue;
+      const nd = dist[k] + (t === T_PATH ? 0 : costAt(ii, jj));
+      if (nd >= dist[kk]) continue;
+      dist[kk] = nd; seen[kk] = k; q.push(kk);
+      if (t === T_PATH && (Math.abs(ii - i) + Math.abs(jj - j) > 8) && nd < hitD){ hit = kk; hitD = nd; }
+    }
+  }
+  if (hit < 0) return false;
+  for (let k = hit; k !== -2; k = seen[k]){ if (tileType[k] === T_EMPTY) tileType[k] = T_PATH; if (seen[k] < 0) break; }
+  return true;
+}
+function applyRegionLand(id){
+  if (id === 'highland'){ applyExpansion(); return; }
+  if (id === 'plains') return;
+  const code = REG_CODE[id];
+  for (let k = 0; k < tileType.length; k++){
+    if (tileReg[k] !== code) continue;
+    if (tileLand[k] === 1 && (tileType[k] === T_BLOCK || tileType[k] === T_EMPTY) && tileBase[k] !== T_LOCK) tileType[k] = T_EMPTY;
+  }
+  applyOpening(id);
+  const R = REGIONS[id];
+  if (R && R.bb && !R.patch){ const b = R.bb; R.patch = makeTerrPatch(b[0], b[1], b[2], b[3], 6); }
+  if (id === 'beach') placeBeachDock();
+}
+function applyRegion(id, free){
+  if (id === 'plains' || !REGIONS[id]) return false;
+  if (regionOpen(id) && !free) return false;
+  if (!G.regions) G.regions = emptyRegions();
+  G.regions[id] = true;
+  if (id === 'highland') G.expand = true;
+  applyRegionLand(id);
+  refreshForestWall(); updateLockMarks();
+  return true;
+}
+function buyRegion(id){
+  ensureTestUnlock();
+  const R = REGIONS[id]; if (!R || id === 'plains') return false;
+  if (regionOpen(id)){ toast(`${R.name} is already open.`, 'bad'); return false; }
+  if (G.stars < R.stars && !G.unlockAll){ toast(`${R.name} unlocks at ${R.stars} star${R.stars === 1 ? '' : 's'}.`, 'bad'); return false; }
+  if (id === 'highland') return buyExpansion();
+  if (G.money < R.cost){ toast(`Not enough funds for the ${R.name} permit.`, 'bad'); return false; }
+  spend('build', R.cost); applyRegion(id, true); afterStructureChange(); SFX.build();
+  toast(`${R.name} permit granted. A path has been cleared through the forest.${id === 'beach' ? ' A beach dock now welcomes guests.' : ''}`, 'good');
+  return true;
+}
+function ensureTestUnlock(){
+  if (!G || !G.unlockAll) return;
+  if (!G.regions) G.regions = emptyRegions();
+  let any = false;
+  for (const id of ['beach', 'valley', 'highland', 'jungle', 'volcano']) if (!regionOpen(id)){ applyRegion(id, true); any = true; }
+  if (any) afterStructureChange();
+}
+function placeBeachDock(){
+  if (REGOPEN.dock) return;
+  let best = null, bs = 1e9;
+  for (let j = LO; j < HI; j++) for (let i = LO; i < HI; i++){
+    if (tileReg[idx(i, j)] !== 3) continue;
+    const x = tX(i), z = tZ(j), h = H(x, z);
+    if (h < 0.4 || h > 3.5) continue;
+    if (H(x, z + 8) > 0.2) continue; // open water to the south
+    const s = Math.hypot(x - 350, z - 90); if (s < bs && tileType[idx(i, j)] === T_EMPTY){ bs = s; best = [i, j, x, z]; }
+  }
+  if (!best) return;
+  const [i, j, x, z] = best;
+  for (let d = 0; d <= 3; d++){ const jj = j + d; if (!inGrid(i, jj)) break; const k = idx(i, jj); if (tileType[k] === T_BLOCK || tileType[k] === T_EMPTY) tileType[k] = T_PATH; }
+  REGOPEN.dock = { i, j, x, z };
+  const bp = REGOPEN.paths.beach;
+  if (bp && bp.length) extendPathToward(i, j, tX(bp[bp.length - 1][0]), tZ(bp[bp.length - 1][1]), 90);
+  else linkOpeningToPark(i, j);
+}
+function unlockedBounds(){
+  let x0 = -140, z0 = -140, x1 = 140, z1 = 160;
+  for (const id of REG_IDS) if (regionOpen(id) && REGIONS[id].bb){ const b = REGIONS[id].bb; x0 = Math.min(x0, b[0]); z0 = Math.min(z0, b[1]); x1 = Math.max(x1, b[2]); z1 = Math.max(z1, b[3]); }
+  return [x0 - 80, z0 - 80, x1 + 80, z1 + 80];
+}
+function maxCamDist(){ const b = unlockedBounds(); return clamp(Math.hypot(b[2] - b[0], b[3] - b[1]) * 1.05, 560, 1100); }
+function lakeRegionOk(i0, j0, i1, j1){
+  let n = 0, ok = 0;
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){ n++; const x = tX(i), z = tZ(j); if (regNameAt(i, j) === 'valley' || regionAt(x, z) === 'valley' || riverDist(x, z) < 22) ok++; }
+  return ok * 2 >= n;
+}
+function lagoonRegionOk(i0, j0, i1, j1){
+  const cx = tX((i0 + i1) / 2), cz = tZ((j0 + j1) / 2);
+  if (regionAt(cx, cz) === 'beach' || lobeN(cx, cz, 350, 40, 200, 180) > 0) return true;
+  for (let j = j0 - 3; j <= j1 + 3; j++) for (let i = i0 - 3; i <= i1 + 3; i++) if (inGrid(i, j) && (regNameAt(i, j) === 'beach' || regionAt(tX(i), tZ(j)) === 'beach')) return true;
+  return false;
+}
+function regionOfPen(pen){ return regionAt((eX(pen.i0) + eX(pen.i1 + 1)) / 2, (eX(pen.j0) + eX(pen.j1 + 1)) / 2); }
+function migrateV11(){
+  if (!G.regions) G.regions = emptyRegions();
+  if (G.expand) G.regions.highland = true;
+  if (G.v11){ for (const id of REG_IDS) if (regionOpen(id)) applyRegionLand(id); updateLockMarks(); refreshForestWall(); return; }
+  G.v11 = true;
+  const mark = (x, z) => { const r = regionAt(x, z); if (r && r !== 'plains' && r !== 'sea' && REGIONS[r]) G.regions[r] = true; };
+  for (const p of pens.values()) mark((eX(p.i0) + eX(p.i1 + 1)) / 2, (eX(p.j0) + eX(p.j1 + 1)) / 2);
+  for (const b of buildings.values()) mark(tX(b.i), tZ(b.j));
+  if (G.expand) G.regions.highland = true;
+  for (const id of REG_IDS) if (regionOpen(id)) applyRegionLand(id);
+  updateLockMarks(); refreshForestWall();
+}
+const FOREST = { items: [], ims: [], built: false };
+function buildForestWall(){
+  if (FOREST.built) return;
+  const r = mulberry(77), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(), p = new THREE.Vector3();
+  const geos = [M.broadleafGeos(1), M.broadleafGeos(2), M.palmGeos()];
+  const kinds = [];
+  for (let j = LO; j < HI; j += 1) for (let i = LO; i < HI; i += 1){
+    const k = idx(i, j); if (tileLand[k] < 2 && !(tileLand[k] === 1 && !regionOpen(REG_NAME[tileReg[k]]))) continue;
+    if (tileType[k] === T_EMPTY || tileType[k] === T_LOCK || tileType[k] === T_PATH) continue;
+    const x = tX(i) + (r() - 0.5) * 3, z = tZ(j) + (r() - 0.5) * 3, h = H(x, z);
+    if (h < 0.5 || h > 40) continue;
+    const dense = tileLand[k] === 2;
+    if (r() > (dense ? 0.55 : 0.12)) continue;
+    if (FOREST.items.length >= 900) break;
+    const kind = dense ? (Math.abs(x) > 200 && z > 0 ? 2 : (r() < 0.5 ? 0 : 1)) : (r() < 0.7 ? 0 : 1);
+    const sc = 0.9 + r() * 0.7;
+    e.set((r() - 0.5) * 0.06, r() * TAU, (r() - 0.5) * 0.06); q.setFromEuler(e); s.set(sc, sc, sc); p.set(x, h - 0.15, z);
+    FOREST.items.push({ m: new THREE.Matrix4().compose(p, q, s), i, j, x, z, kind, k });
+  }
+  const caps = [500, 500, 280];
+  const mats = [
+    [barkMat, leafMat],
+    [barkMat, leafMat],
+    [barkMat, frondMat]
+  ];
+  FOREST.ims = geos.map((G, ki) => {
+    const parts = ki === 2 ? [[G.trunk, mats[ki][0]], [G.crown, mats[ki][1]]] : [[G.trunk, mats[ki][0]], [G.canopy, mats[ki][1]]];
+    return parts.map(([geo, mat]) => { const im = new THREE.InstancedMesh(geo, mat, caps[ki]); im.castShadow = QUALITY.level >= 1; im.receiveShadow = true; im.frustumCulled = true; im.count = 0; scene.add(im); return im; });
+  });
+  FOREST.built = true;
+  refreshForestWall();
+}
+function refreshForestWall(){
+  if (!FOREST.built) return;
+  const lvl = QUALITY.level === 0 ? 0.45 : QUALITY.level === 1 ? 0.75 : 1;
+  const counts = [0, 0, 0];
+  for (const it of FOREST.items){
+    const k = inGrid(it.i, it.j) ? idx(it.i, it.j) : -1;
+    if (k >= 0 && (tileType[k] === T_PATH || tileType[k] === T_BUILD || tileType[k] === T_PEN || tileLand[k] === 3 || (tileType[k] === T_EMPTY && tileLand[k] !== 2))) continue;
+    if (k >= 0 && tileLand[k] === 1 && regionOpen(REG_NAME[tileReg[k]])) continue;
+    const ims = FOREST.ims[it.kind]; if (!ims || counts[it.kind] >= ims[0].instanceMatrix.count * lvl) continue;
+    for (const im of ims) im.setMatrixAt(counts[it.kind], it.m);
+    counts[it.kind]++;
+  }
+  FOREST.ims.forEach((ims, ki) => { for (const im of ims){ im.count = counts[ki]; im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); } });
+}
+function lockCanvas(){ const c = M.mk(128, 128), g = c.getContext('2d');
+  g.fillStyle = 'rgba(16,14,10,0.55)'; g.beginPath(); g.arc(64, 64, 60, 0, TAU); g.fill();
+  g.fillStyle = '#f2c230'; g.strokeStyle = '#1b1408'; g.lineWidth = 5; g.beginPath(); g.roundRect(34, 58, 60, 44, 8); g.fill(); g.stroke();
+  g.beginPath(); g.arc(64, 58, 20, Math.PI, 0, true); g.lineWidth = 10; g.strokeStyle = '#f2c230'; g.stroke();
+  g.fillStyle = '#1b1408'; g.beginPath(); g.arc(64, 78, 6, 0, TAU); g.fill(); g.fillRect(61, 78, 6, 14);
+  return c; }
+const lockMat = new THREE.SpriteMaterial({ map: canvasTex(lockCanvas(), true, false), depthTest: false, transparent: true, fog: false });
+const lockMarks = {};
+function updateLockMarks(){
+  for (const id of ['beach', 'valley', 'highland', 'jungle', 'volcano']){
+    const open = regionOpen(id); let s = lockMarks[id];
+    if (open){ if (s) s.visible = false; continue; }
+    if (!s){ s = new THREE.Sprite(lockMat); s.renderOrder = 12; scene.add(s); lockMarks[id] = s; }
+    const [x, z] = REGIONS[id].mark; s.position.set(x, H(x, z) + 22, z); const sc = clamp(cam.dist * 0.06, 8, 22); s.scale.set(sc, sc, 1); s.visible = true;
+  }
+}
+function pickLock(sx, sy){
+  let best = null, bd = 48;
+  for (const id of Object.keys(lockMarks)){ const s = lockMarks[id]; if (!s || !s.visible) continue;
+    const v = s.position.clone().project(camera); if (v.z > 1) continue;
+    const x = (v.x * 0.5 + 0.5) * innerWidth, y = (-v.y * 0.5 + 0.5) * innerHeight; const d = Math.hypot(x - sx, y - sy);
+    if (d < bd){ bd = d; best = id; } }
+  return best;
+}
+function regionSheetHtml(){
+  ensureTestUnlock();
+  const card = (id) => {
+    const R = REGIONS[id], open = regionOpen(id), need = R.stars > 0 && G.stars < R.stars && !G.unlockAll && !open;
+    const can = !open && !need && (id === 'highland' ? G.money >= EXPAND_COST : G.money >= R.cost || id === 'plains');
+    return `<div class="reg ${open ? 'open' : 'lock'}">
+      <div class="row"><span class="k">${open ? 'Open' : 'Locked'} — ${R.name}</span><span class="v">${id === 'plains' ? 'Home' : open ? 'Permit owned' : fmtK(R.cost)}</span></div>
+      <div class="meta">${R.stars ? R.stars + ' star' + (R.stars === 1 ? '' : 's') + ' required. ' : ''}${R.special}</div>
+      ${open || id === 'plains' ? '' : `<div class="btns"><button class="btn ${can ? 'pri' : ''}" data-act="region" data-reg="${id}" ${need || (G.money < R.cost && !G.unlockAll) ? 'disabled' : ''}>${need ? 'Needs ' + R.stars + ' stars' : 'Buy land permit <small>' + fmtK(R.cost) + '</small>'}</button></div>`}
+    </div>`;
+  };
+  const ma = monoAdvice(), ml = MONO.lines.filter(L => L.ok);
+  return `<div class="lbl" style="margin:14px 0 4px">Island regions</div>
+    <div class="note">The main plains are yours. Thick forest rings the park: buy a land permit to clear a path into a new region. Far regions also need a star rating. Highland Ridge still needs the monorail.</div>
+    ${card('plains')}${card('beach')}${card('valley')}${card('highland')}${card('jungle')}${card('volcano')}
+    ${G.regions && G.regions.highland ? `<div class="note">${ml.length ? `Monorail: ${ml.length} line${ml.length > 1 ? 's' : ''} running, ${G.stats.monoRides || 0} rides so far.` : 'No footpath crosses the Highland ridge: build a Monorail (Build > Paths) to bring guests out there.'}${G.monoCredit ? ` Free starter line: ${fmt(G.monoCredit)} of track credit.` : ''}</div>${ma ? `<div class="note warn">${ma}</div>` : ''}` : ''}`;
+}
+
 function gradeCost(i0, j0, i1, j1, rate){ let s = 0; for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){ if (!inGrid(i, j)) continue; const k = idx(i, j); if (tileBase[k] === T_LOCK) s += Math.max(0, tileGrade[k] - 0.4); } return Math.round(s * rate / 10) * 10; }
 function bldCost(type, i, j){ const B = BUILD[type]; if (B.inPen) return B.cost; const [w, h] = footprint(type, 0); return B.cost + gradeCost(i, j, i + w - 1, j + h - 1, GRADE.bld); }
 function pathTilesCost(tiles){ let c = 0; for (const [i, j] of tiles) c += BUILD.path.cost + gradeCost(i, j, i, j, GRADE.path); return c; }
@@ -461,6 +880,7 @@ function makeBuildingMesh(type){
 }
 function footprint(type, rot){ const f = M.FOOT[type] || [1, 1]; return (Math.abs(Math.sin(rot)) > 0.5) ? [f[1], f[0]] : [f[0], f[1]]; }
 function canPlace(type, i, j){
+  ensureTestUnlock();
   const B = BUILD[type]; const [w, h] = footprint(type, 0);
   if (B.inPen){ if (!inGrid(i, j)) return { ok: false, why: 'Outside the park' }; const k = idx(i, j); if (tileType[k] !== T_PEN) return { ok: false, why: 'Feeders go inside an enclosure' };
     const pen = pens.get(tileRef[k]); if (pen.feeders.some(f => f.i === i && f.j === j)) return { ok: false, why: 'Tile already has a feeder' };
@@ -468,7 +888,7 @@ function canPlace(type, i, j){
     if (pen.kind === 'lagoon' && type !== 'fish') return { ok: false, why: 'Only a Fish Chute works in a lagoon' };
     if (type !== 'fish' && lakeAt(tX(i), tZ(j)) && H(tX(i), tZ(j)) < lakeAt(tX(i), tZ(j)).wl + 0.2) return { ok: false, why: 'Put it on dry ground, not in the lake' };
     return { ok: true, pen }; }
-  for (let dj = 0; dj < h; dj++) for (let di = 0; di < w; di++){ const ii = i + di, jj = j + dj; if (!inGrid(ii, jj)) return { ok: false, why: 'Outside the park' }; const t = tileType[idx(ii, jj)]; if (type === 'stand' && t === T_BLOCK && tileBase[idx(ii, jj)] === T_BLOCK && Math.abs(H(tX(ii), tZ(jj))) < 2.5) continue; if (t !== T_EMPTY) return { ok: false, why: t === T_LOCK ? LOCK_WHY : t === T_BLOCK ? 'Ground too rough' : 'Tile is occupied' }; }
+  for (let dj = 0; dj < h; dj++) for (let di = 0; di < w; di++){ const ii = i + di, jj = j + dj; if (!inGrid(ii, jj)) return { ok: false, why: 'Outside the park' }; const t = tileType[idx(ii, jj)]; if (type === 'stand' && t === T_BLOCK && tileBase[idx(ii, jj)] === T_BLOCK && Math.abs(H(tX(ii), tZ(jj))) < 2.5) continue; if (t !== T_EMPTY) return { ok: false, why: lockWhyAt(ii, jj) }; }
   return { ok: true };
 }
 function faceRot(i, j, w, h){
@@ -564,15 +984,18 @@ function rebuildFences(){ camObsDirty = true;
   FENCE_IM.forEach((F, t) => { F.post.count = counts[t][0]; F.panel.count = counts[t][1]; F.post.instanceMatrix.needsUpdate = true; F.panel.instanceMatrix.needsUpdate = true; if (F.mesh){ F.mesh.count = counts[t][2]; F.mesh.instanceMatrix.needsUpdate = true; } });
 }
 function penCanBuild(i0, j0, i1, j1, kind = 'land'){
+  ensureTestUnlock();
   if (i1 - i0 < 2 || j1 - j0 < 2) return { ok: false, why: 'Enclosures must be at least 3 x 3 tiles' };
   if (i1 - i0 > 15 || j1 - j0 > 15) return { ok: false, why: 'Maximum size is 16 x 16 tiles' };
   if (kind === 'lake' && (i1 - i0 < 4 || j1 - j0 < 4)) return { ok: false, why: 'A lake enclosure needs at least 5 x 5 tiles' };
+  if (kind === 'lake' && !lakeRegionOk(i0, j0, i1, j1)) return { ok: false, why: 'Lake enclosures can only be built in the River Valley (unlock it in Park).' };
   if (kind === 'lagoon'){ if (i1 - i0 < 3 || j1 - j0 < 3) return { ok: false, why: 'A lagoon needs at least 4 x 4 tiles' };
+    if (!lagoonRegionOk(i0, j0, i1, j1)) return { ok: false, why: 'Ocean lagoons can only be built on the Beach Coast (unlock it in Park).' };
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){ if (!inGrid(i, j)) return { ok: false, why: 'Outside the park' }; const k = idx(i, j);
       if (tileType[k] !== T_BLOCK || tileBase[k] !== T_BLOCK || H(tX(i), tZ(j)) > -1.6) return { ok: false, why: tileType[k] === T_PEN ? 'Overlaps another enclosure' : 'Lagoons go on open sea at least 2 m deep' };
       if (!lagoonClear(tX(i), tZ(j))) return { ok: false, why: 'Too close to the pier or the ferry lane (keep 24 m clear)' }; }
     return { ok: true }; }
-  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){ if (!inGrid(i, j)) return { ok: false, why: 'Outside the park' }; const t = tileType[idx(i, j)]; if (t !== T_EMPTY) return { ok: false, why: t === T_LOCK ? LOCK_WHY : t === T_BLOCK ? 'Ground too rough or wet' : 'Overlaps a path, building or enclosure' }; }
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){ if (!inGrid(i, j)) return { ok: false, why: 'Outside the park' }; const t = tileType[idx(i, j)]; if (t !== T_EMPTY) return { ok: false, why: lockWhyAt(i, j) }; }
   return { ok: true };
 }
 function penCost(i0, j0, i1, j1, tier, kind = 'land'){ const per = 2 * (i1 - i0 + 1) + 2 * (j1 - j0 + 1), area = (i1 - i0 + 1) * (j1 - j0 + 1);
@@ -664,7 +1087,9 @@ function dinoComfort(d){
   const social = same < S.group[0] ? same / S.group[0] : same > S.group[1] ? S.group[1] / same : 1;
   const food = foodScore(pen, d.sp); const mixed = mates.some(o => SPECIES[o.sp].diet !== S.diet || (S.diet === 'meat' && o.sp !== d.sp));
   const water = !needsWater(d.sp) || hasWater(pen) ? 1 : 0;
-  return { space, social, food, water, mixed, total: clamp(space * 0.3 + social * 0.2 + food * 0.25 + water * 0.15 + (mixed ? 0 : 0.1), 0, 1) };
+  let total = clamp(space * 0.3 + social * 0.2 + food * 0.25 + water * 0.15 + (mixed ? 0 : 0.1), 0, 1);
+  if ((d.sp === 'raptor' || d.sp === 'dilo') && regionOfPen(pen) === 'jungle') total = clamp(total + 0.15, 0, 1);
+  return { space, social, food, water, mixed, total };
 }
 function moveToward(d, tx, tz, maxV, dt, turnRate, hunt){
   const dx = tx - d.x, dz = tz - d.z, dist = Math.hypot(dx, dz); let want = 0;
@@ -931,8 +1356,10 @@ const _looks = new Map(); function lookOf(g){ let l = _looks.get(g.id); if (!l){
 const SHIRTS = [0xd8cfb8, 0x2f4a6a, 0x7a2e24, 0x3c5a34, 0xc9a038, 0x4a4a48, 0xe8e4da, 0x6a4a7a, 0x2a6a6a, 0xb86a3a, 0x8a8a5a, 0x1e2a3a];
 let guests = [];
 const exitDist = new Int32Array(GN * GN); const viewMap = new Float32Array(GN * GN);
+const farPathK = [];
 function computeExitField(){ exitDist.fill(1e6); const q = []; for (const i of [GATE.i, GATE.i + 1]){ const k = idx(i, GATE.j); exitDist[k] = 0; q.push(k); }
-  while (q.length){ const k = q.shift(); const i = kI(k), j = kJ(k); for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const ii = i + di, jj = j + dj; if (!isPath(ii, jj)) continue; const kk = idx(ii, jj); if (exitDist[kk] > exitDist[k] + 1){ exitDist[kk] = exitDist[k] + 1; q.push(kk); } } } }
+  while (q.length){ const k = q.shift(); const i = kI(k), j = kJ(k); for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const ii = i + di, jj = j + dj; if (!isPath(ii, jj)) continue; const kk = idx(ii, jj); if (exitDist[kk] > exitDist[k] + 1){ exitDist[kk] = exitDist[k] + 1; q.push(kk); } } }
+  farPathK.length = 0; for (let k = 0; k < tileType.length; k++) if (tileType[k] === T_PATH && exitDist[k] < 1e6 && tileReg[k] > 2) farPathK.push(k); }
 function computeViewMap(){
   viewMap.fill(0); const plats = [...buildings.values()].filter(b => b.type === 'viewing' || b.type === 'stand'); penSpots = [];
   for (const pen of pens.values()){ const ds = dinos.filter(d => d.pen === pen.id && (d.state === 'pen')); if (!ds.length) continue; let spot = -1, sv = 0;
@@ -1132,6 +1559,14 @@ function updateFerries(dt){ if (!pierMesh) return; FERRY.cool -= dt;
 const GATE_OUT = () => [tX(GATE.i) + TILE / 2, tZ(GATE.j) + 6];
 function spawnGuest(){
   if (guests.length >= QUALITY.guests[QUALITY.level] || G.money < -1e9) return null;
+  const dock = REGOPEN.dock && regionOpen('beach') && isPath(REGOPEN.dock.i, REGOPEN.dock.j) && exitDist[idx(REGOPEN.dock.i, REGOPEN.dock.j)] < 1e6;
+  const far = farPathK;
+  if (dock && rnd() < 0.28){ const g = { id: G.nextId++, x: REGOPEN.dock.x + fr(-1.2, 1.2), z: REGOPEN.dock.z + fr(-1, 1), hd: Math.PI, state: 'walk', wp: null, ci: REGOPEN.dock.i, cj: REGOPEN.dock.j, pi: -1, pj: -1, ni: -1, nj: -1,
+    off: fr(-1.2, 1.2), speed: fr(2.8, 3.6), money: fr(60, 220), happy: fr(55, 75), hunger: fr(0, 0.4), thirst: fr(0, 0.4), bladder: fr(0, 0.4), stay: fr(5, 9), dest: -1, goal: '', linger: 0, seen: new Set(), bored: 0, phase: rnd() * TAU, shirt: SHIRTS[(rnd() * SHIRTS.length) | 0], visited: new Set(), moving: 1, gone: false, panicT: 0 };
+    g.tx = g.x; g.tz = g.z; if (g.money >= G.price){ g.money -= G.price; earn('tickets', G.price); } G.stats.guestsTotal++; G.stats.guestsToday++; guests.push(g); return g; }
+  if (far.length && rnd() < 0.12){ const k2 = far[(rnd() * far.length) | 0]; const g = { id: G.nextId++, x: tX(kI(k2)), z: tZ(kJ(k2)), hd: rnd() * TAU, state: 'walk', wp: null, ci: kI(k2), cj: kJ(k2), pi: -1, pj: -1, ni: -1, nj: -1,
+    off: fr(-1.2, 1.2), speed: fr(2.8, 3.6), money: fr(60, 220), happy: fr(55, 75), hunger: fr(0, 0.4), thirst: fr(0, 0.4), bladder: fr(0, 0.4), stay: fr(5, 9), dest: -1, goal: '', linger: 0, seen: new Set(), bored: 0, phase: rnd() * TAU, shirt: SHIRTS[(rnd() * SHIRTS.length) | 0], visited: new Set(), moving: 1, gone: false, panicT: 0 };
+    g.tx = g.x; g.tz = g.z; if (g.money >= G.price){ g.money -= G.price; earn('tickets', G.price); } G.stats.guestsTotal++; G.stats.guestsToday++; guests.push(g); return g; }
   const g = { id: G.nextId++, x: GANG[0] + fr(-1.2, 1.2), z: GANG[1] - fr(0, 0.6), hd: Math.PI, state: 'enter', wp: [[fr(-1.3, 1.3), DOCKH.z0 - 0.5], [fr(-1.3, 1.3), PIER.z0 + 1.5]], ci: GATE.i + (rnd() < 0.5 ? 0 : 1), cj: GATE.j, pi: -1, pj: -1, ni: -1, nj: -1,
     off: fr(-1.2, 1.2), speed: fr(2.8, 3.6), money: fr(60, 220), happy: fr(55, 75), hunger: fr(0, 0.4), thirst: fr(0, 0.4), bladder: fr(0, 0.4), stay: fr(5, 9), dest: -1, goal: '', linger: 0, seen: new Set(), bored: 0, phase: rnd() * TAU, shirt: SHIRTS[(rnd() * SHIRTS.length) | 0], visited: new Set(), moving: 1, gone: false, panicT: 0 };
   g.tx = g.wp[0][0]; g.tz = g.wp[0][1];
@@ -1426,7 +1861,7 @@ function earn(cat, amt){ G.money += amt; G.ledger[cat] = (G.ledger[cat] || 0) + 
 function spend(cat, amt){ G.money -= amt; G.ledger[cat] = (G.ledger[cat] || 0) + amt; flowAdd(cat, amt); }
 const INCOME = ['tickets', 'shops'];
 function ledgerProfit(L){ let p = 0; for (const k in L) p += INCOME.includes(k) ? L[k] : -L[k]; return p; }
-function appealTotal(){ const seen = {}; let a = MONO.lines.filter(L => L.ok).reduce((s, L, n) => s + (n ? 10 : 30), 0); /* v10: the monorail is a ride in its own right */ for (const d of dinos){ if (d.state === 'holding' || d.state === 'wild' || d.state === 'carcass' || d.state === 'escaping') continue; seen[d.sp] = (seen[d.sp] || 0) + 1; a += SPECIES[d.sp].appeal * Math.pow(0.75, seen[d.sp] - 1); } return a; }
+function appealTotal(){ const seen = {}; let a = MONO.lines.filter(L => L.ok).reduce((s, L, n) => s + (n ? 10 : 30), 0); /* v10: the monorail is a ride in its own right */ for (const d of dinos){ if (d.state === 'holding' || d.state === 'wild' || d.state === 'carcass' || d.state === 'escaping') continue; seen[d.sp] = (seen[d.sp] || 0) + 1; const pen = pens.get(d.pen); const volc = pen && regionOfPen(pen) === 'volcano'; a += SPECIES[d.sp].appeal * Math.pow(0.75, seen[d.sp] - 1) * (volc ? 1.4 : 1); } return a; }
 const DINO_UPKEEP = 400;
 // a hatchery with no egg in it only needs a caretaker; the full bill applies while it incubates
 function bldUpkeep(b){ const B = BUILD[b.type]; if (b.type === 'hatchery'){ const hs = hatcheries(), k = hs.indexOf(b); return k >= 0 && eggs.length > k * 2 ? B.upkeep : B.idleUpkeep; } return B.upkeep || 0; }
@@ -1452,7 +1887,8 @@ const MISSIONS = [
   { id: 'profit', name: 'Spared No Expense', desc: 'Make a daily profit of $40,000.', reward: 50000, check: () => G.stats.bestProfit >= 40000 },
   { id: 'king', name: 'The King', desc: 'Hatch a Tyrannosaurus rex.', reward: 80000, check: () => G.stats.trex >= 1 },
   { id: 'menu', name: 'Something for Everyone', desc: 'Open three different kinds of food or drink stand.', reward: 20000, check: () => new Set([...buildings.values()].filter(b => SHOP[b.type]).map(b => b.type)).size >= 3 },
-  { id: 'expand', name: 'Room to Roam', desc: 'Buy the Expansion permit to open the new land.', reward: 30000, check: () => !!G.expand },
+  { id: 'expand', name: 'Room to Roam', desc: 'Buy the Highland Ridge permit to open the rough country.', reward: 30000, check: () => !!G.expand },
+  { id: 'beach', name: 'Down to the Sea', desc: 'Buy the Beach Coast permit.', reward: 25000, check: () => !!(G.regions && G.regions.beach) },
   { id: 'aviary', name: 'Look, Up There', desc: 'Hatch a pterosaur in an aviary.', reward: 30000, check: () => dinos.some(d => habOf(d.sp) === 'aviary') },
   { id: 'lake', name: 'River Monster', desc: 'Keep a Spinosaurus in a lake enclosure.', reward: 90000, check: () => dinos.some(d => d.sp === 'spino' && d.state !== 'carcass') },
   { id: 'deep', name: 'Something in the Water', desc: 'Keep a Mosasaurus in an ocean lagoon.', reward: 100000, check: () => dinos.some(d => d.sp === 'mosa' && d.state !== 'carcass') },
@@ -1696,7 +2132,7 @@ function renderSheet(){
       <div class="row"><span class="k">Construction and hatching</span><span class="v">-${fmt(L.build + L.hatch)}</span></div><div class="row"><span class="k">Fines and emergencies</span><span class="v">-${fmt(L.fines + L.other)}</span></div>
       <div class="row"><span class="k"><b>Profit so far</b></span><span class="v" style="color:${pr < 0 ? '#ff8a6a' : 'var(--ok)'}">${fmt(pr)}</span></div>
       <div class="row"><span class="k">Incidents</span><span class="v">${G.stats.breakouts} breakouts, ${G.stats.deaths + G.stats.fed} guests lost</span></div>
-      ${(() => { const lc = landCounts(); const ma = monoAdvice(), ml = MONO.lines.filter(L => L.ok); return G.expand ? `<div class="note">Expansion permit owned: ${lc.total} buildable tiles (${lc.old} original + ${lc.locked} new rough ground). ${ml.length ? `Monorail: ${ml.length} line${ml.length > 1 ? 's' : ''} running, ${G.stats.monoRides || 0} rides so far.` : 'No footpath crosses the ridge: build a Monorail (Build > Paths) to bring guests out there.'}${G.monoCredit ? ` Free starter line: ${fmt(G.monoCredit)} of track credit.` : ''}</div>${ma ? `<div class="note warn">${ma}</div>` : ''}` : `<div class="lbl" style="margin:14px 0 4px">Expand the island</div><div class="note">An Expansion permit opens ${lc.locked} new tiles (${Math.round(lc.locked / lc.old * 100)}% more land) of rugged hills, cliffs and jungle beyond a rocky ridge. Footpaths cannot cross the ridge: guests reach it by a Monorail you build. Levelling rough ground costs extra.</div><div class="btns"><button class="btn pri" data-act="expand" ${G.money < EXPAND_COST ? 'disabled' : ''}>Buy Expansion permit <small>${fmtK(EXPAND_COST)}</small></button></div>`; })()}
+      ${regionSheetHtml()}
       <div class="lbl" style="margin:12px 0 4px">Building colours (park-wide)</div><div class="chips">${M.BLD_PALETTES.map(P => `<button class="chip ${P.id === (G.bldPal || 'classic') ? 'on' : ''}" data-bpal="${P.id}">${P.cols ? `<span class="sw" style="background:linear-gradient(90deg,${P.cols.map(c => '#' + c.toString(16).padStart(6, '0')).join(',')})"></span>` : ''}${P.name}</button>`).join('')}</div>
       <div class="btns"><button class="btn" data-act="quality">Graphics: ${['Low', 'Medium', 'High'][QUALITY.level]}</button><button class="btn" data-act="save">${ic('save')}Save</button></div>
       <div class="btns"><button class="btn pri" data-act="tips">How to make money</button><button class="btn" data-act="income">Income</button></div>
@@ -1762,6 +2198,7 @@ $('sheet').onclick = (e) => {
   if (act === 'demob'){ const b = buildings.get(sel.ref); G.money += BUILD[b.type].cost * 0.5; removeBuilding(b); afterStructureChange(); closeSheet(); return; }
   if (act === 'pdown' || act === 'pup'){ G.price = clamp(G.price + (act === 'pup' ? 5 : -5), 0, 150); renderSheet(); return; }
   if (act === 'expand'){ if (buyExpansion()) renderSheet(); return; }
+  if (act === 'region'){ const id = t.dataset.reg; if (buyRegion(id)) renderSheet(); return; }
   if (act === 'quality'){ setQuality((QUALITY.level + 2) % 3, true); renderSheet(); return; }
   if (act === 'save'){ saveGame(); toast('Park saved.', 'good'); return; }
   if (act === 'tutorial'){ closeSheet(); showTutorial(0); return; }
@@ -1896,7 +2333,7 @@ function showMoneyTips(){ const m = $('modal'); const best = 48; const sp = SPEC
     ${li('Food and drink', `Guests get hungry and thirsty. Burgers ${fmt(SHOP.food.p)}, pizza ${fmt(SHOP.pizza.p)} and the Fossil Grill ${fmt(SHOP.restaurant.p)} fix hunger; Cold Drinks ${fmt(SHOP.drinks.p)}, coffee ${fmt(SHOP.coffee.p)} and ice cream ${fmt(SHOP.icecream.p)} fix thirst. A mix of stands keeps guests happier than one kind.`)}
     ${li('Water and the right food', 'Every land animal and pterosaur needs a Water Hole in its enclosure. Each species has favourite food: sauropods love the Browse Tower, big carnivores the Live Goat Corral, Spinosaurus, marine reptiles and pterosaurs the Fish Chute. Favourite food fills them faster.')}
     ${li('Carnivores hunt', 'Put a carnivore in with herbivores or smaller carnivores and it will hunt them when hungry. The kill draws a crowd for a while, but you lose the animal and what it cost. Armoured giants such as Ankylosaurus and Triceratops fight back.')}
-    ${li('New habitats', 'Buy the Expansion permit for more land. Aviaries hold Pteranodon and Dimorphodon, lake enclosures hold Spinosaurus and Sarcosuchus, and ocean lagoons out in the sea hold Mosasaurus and Elasmosaurus. A Lagoon Grandstand beside a lagoon or lake more than doubles what guests get from it.')}
+    ${li('New habitats', 'Buy land permits in Park to open new regions beyond the forest wall. Aviaries hold Pteranodon and Dimorphodon, lake enclosures in the River Valley hold Spinosaurus and Sarcosuchus, and ocean lagoons on the Beach Coast hold Mosasaurus and Elasmosaurus. A Lagoon Grandstand beside a lagoon or lake more than doubles what guests get from it.')}
     ${li('Ticket price', `Each $6 on the price drives away about 10% of new guests. Around ${fmt(best - 3)} to ${fmt(best + 2)} earns the most per day. Higher only pays once the park is famous.`)}
     ${li('What it costs each day', `Visitor Centre ${fmt(BUILD.visitor.upkeep)}, Hatchery ${fmt(BUILD.hatchery.upkeep)} while incubating (${fmt(BUILD.hatchery.idleUpkeep)} when empty), Food Stand ${fmt(BUILD.food.upkeep)}, Restrooms ${fmt(BUILD.restroom.upkeep)}, each dinosaur ${fmt(DINO_UPKEEP)} plus its meals (Parasaurolophus ${fmt(sp.para.feed / 2)} a meal). Fences cost a little per segment. Only build what earns its keep.`)}
     ${li('Stars and goals', 'Each star brings about 12% more guests and unlocks new species. Completing goals pays investor bonuses, from $20,000 for your first dinosaur.')}
@@ -1948,7 +2385,7 @@ function clearPending(){ pendMesh.visible = false; if (monoPrev) monoPrev.visibl
 function pathRoute(a, b){ const out = []; let [i, j] = a; const [i1, j1] = b; const xFirst = Math.abs(i1 - i) >= Math.abs(j1 - j);
   out.push([i, j]); const stepI = () => { while (i !== i1){ i += Math.sign(i1 - i); out.push([i, j]); } }, stepJ = () => { while (j !== j1){ j += Math.sign(j1 - j); out.push([i, j]); } };
   if (xFirst){ stepI(); stepJ(); } else { stepJ(); stepI(); } return out; }
-function pathTileOk(i, j){ if (!inGrid(i, j)) return 'Outside the park'; const t = tileType[idx(i, j)]; if (t === T_EMPTY || t === T_PATH) return ''; return t === T_LOCK ? LOCK_WHY : t === T_BLOCK ? 'Ground too rough for a path' : t === T_PEN ? 'Paths cannot cross an enclosure' : 'A building is in the way'; }
+function pathTileOk(i, j){ if (!inGrid(i, j)) return 'Outside the park'; ensureTestUnlock(); const t = tileType[idx(i, j)]; if (t === T_EMPTY || t === T_PATH) return ''; if (t === T_LOCK || t === T_BLOCK){ const w = lockWhyAt(i, j); return w === 'Ground too rough' ? 'Ground too rough for a path' : w; } return t === T_PEN ? 'Paths cannot cross an enclosure' : 'A building is in the way'; }
 function pendingTiles(){ const seen = new Set(), out = []; if (!tool || !tool.nodes) return out;
   const add = ([i, j]) => { const k = idx(i, j); if (seen.has(k)) return; seen.add(k); if (tileType[k] === T_EMPTY) out.push([i, j]); };
   if (tool.nodes.length === 1) add(tool.nodes[0]); for (const s of tool.segs) s.forEach(add); return out; }
@@ -2211,7 +2648,7 @@ function renderUndoBar(){ const el = $('undoBar'); if (!undoRec){ el.classList.a
   el.innerHTML = `<span>Placed ${undoRec.label}</span><button class="btn" data-t="undolast">${ic('undo')}Undo</button>`; el.classList.remove('hidden'); placeUndoBar(); }
 function placeUndoBar(){ const el = $('undoBar'); if (!el || el.classList.contains('hidden')) return; const ref = tool ? $('toolbar') : $('dock'); const r = ref.getBoundingClientRect(); el.style.bottom = (r.height > 0 ? innerHeight - r.top + 8 : 90) + 'px'; }
 $('undoBar').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; SFX.unlock(); undoLast(); };
-function afterStructureChange(){ drawMask(); computeExitField(); monoRefresh(); rebuildGuestSpots(); rebuildFences(); refreshVegetation(); computeViewMap(); }
+function afterStructureChange(){ drawMask(); computeExitField(); monoRefresh(); rebuildGuestSpots(); rebuildFences(); refreshVegetation(); refreshForestWall(); updateLockMarks(); computeViewMap(); }
 
 /* ================= camera + input ================= */
 /* v7 camera clipping: pull the camera in front of buildings and fence walls between it and its target (foliage and bark fade out near the camera instead) */
@@ -2238,11 +2675,11 @@ function cameraClearance(ax, ay, az, bx, by, bz){ // fraction of the target->cam
   if (best >= 1) return 1; return clamp(best, Math.min(1, 4 / L), 1); }
 const cam = { tx: 0, tz: 40, clip: 1, yaw: 0.5, pitch: 0.62, dist: 210, goal: { tx: 0, tz: 40, yaw: 0.5, pitch: 0.62, dist: 210 }, shake: 0, follow: null };
 const title = { on: true };
-function focusOn(x, z, dist){ cam.goal.tx = x; cam.goal.tz = z; if (dist) cam.goal.dist = clamp(dist, 12, 560); }
+function focusOn(x, z, dist){ cam.goal.tx = x; cam.goal.tz = z; if (dist) cam.goal.dist = clamp(dist, 12, maxCamDist()); }
 function updateCamera(dt){
   const g = cam.goal; if (cam.follow){ if (!dinos.includes(cam.follow) || !cam.follow.model.root.visible) cam.follow = null; else { g.tx = cam.follow.x; g.tz = cam.follow.z; } }
   if (title.on){ g.yaw += dt * 0.04; } else updateFling(dt);
-  g.pitch = clamp(g.pitch, 0.1, 1.45); g.dist = clamp(g.dist, 12, 560); scene.fog.density = 0.0016 * clamp(1 - (cam.dist - 300) / 680, 0.6, 1); /* v10: the whole island fits when zoomed out */ g.tx = clamp(g.tx, -WHALF - 30, WHALF + 30); g.tz = clamp(g.tz, -WHALF - 40, HALF + 40);
+  g.pitch = clamp(g.pitch, 0.1, 1.45); const md = maxCamDist(); g.dist = clamp(g.dist, 12, md); scene.fog.density = 0.00115 * clamp(1 - (cam.dist - 400) / 1400, 0.55, 1); const ub = unlockedBounds(); g.tx = clamp(g.tx, ub[0], ub[2]); g.tz = clamp(g.tz, ub[1], ub[3]);
   const k = 10; cam.tx = damp(cam.tx, g.tx, k, dt); cam.tz = damp(cam.tz, g.tz, k, dt); cam.dist = damp(cam.dist, g.dist, k, dt); cam.pitch = damp(cam.pitch, g.pitch, k, dt);
   let dy = g.yaw - cam.yaw; if (dy > Math.PI || dy < -Math.PI){ dy = ((dy + Math.PI) % TAU + TAU) % TAU - Math.PI; g.yaw = cam.yaw + dy; }
   cam.yaw += dy * (1 - Math.exp(-k * dt));
@@ -2255,6 +2692,7 @@ function updateCamera(dt){
   const floor = Math.max(H(px, pz), 0) + 2.5; if (py < floor){ py = floor; } nearVegTick(dt);
   cam.shake = Math.max(0, cam.shake - dt * 1.5); const sh = cam.shake * cam.shake;
   camera.position.set(px + (rnd() - 0.5) * sh, py + (rnd() - 0.5) * sh, pz + (rnd() - 0.5) * sh); camera.lookAt(cam.tx, ty, cam.tz);
+  if (typeof updateLockMarks === 'function') { for (const id in lockMarks){ const s = lockMarks[id]; if (!s || !s.visible) continue; const sc = clamp(cam.dist * 0.06, 8, 22); s.scale.set(sc, sc, 1); } }
 }
 const raycaster = new THREE.Raycaster(); const _ndc = new THREE.Vector2();
 function groundAtScreen(x, y, cm = camera){
@@ -2272,6 +2710,7 @@ function pickDino(x, y){ let best = null, bd = 1e9; const f = innerHeight / 2 / 
   return best; }
 function tap(x, y){
   if (tool){ return; }
+  const lk = pickLock(x, y); if (lk){ SFX.click(); openSheet('park'); toast(`${REGIONS[lk].name}: ${REGIONS[lk].special} Permit ${fmtK(REGIONS[lk].cost)}${REGIONS[lk].stars ? ', ' + REGIONS[lk].stars + ' stars' : ''}.`, 'good'); return; }
   const d = pickDino(x, y); if (d){ SFX.click(); openSheet('dino', d); return; }
   if (cam.dist < 150){ const gu = pickGuest(x, y); if (gu){ SFX.click(); openSheet('guest', gu); return; } }
   const t = tileAtScreen(x, y); if (!t){ closeSheet(); return; } const k = idx(t[0], t[1]);
@@ -2319,10 +2758,10 @@ canvas.addEventListener('pointermove', (e) => {
    spread (zoom in) or twist (map turns the same way as the fingers). Rays use the target camera, not the smoothed one. */
 const goalCamera = new THREE.PerspectiveCamera();
 function syncGoalCamera(){ const g = cam.goal; goalCamera.fov = camera.fov; goalCamera.aspect = camera.aspect; goalCamera.near = camera.near; goalCamera.far = camera.far; goalCamera.updateProjectionMatrix();
-  const pitch = clamp(g.pitch, 0.1, 1.45), dist = clamp(g.dist, 12, 560); const ty = Math.max(H(g.tx, g.tz), 0) + 0.5; const cp = Math.cos(pitch);
+  const pitch = clamp(g.pitch, 0.1, 1.45), dist = clamp(g.dist, 12, maxCamDist()); const ty = Math.max(H(g.tx, g.tz), 0) + 0.5; const cp = Math.cos(pitch);
   goalCamera.position.set(g.tx + Math.sin(g.yaw) * cp * dist, ty + Math.sin(pitch) * dist, g.tz + Math.cos(g.yaw) * cp * dist); goalCamera.lookAt(g.tx, ty, g.tz); goalCamera.updateMatrixWorld(true); }
 function grabMap(l, n){ const g = cam.goal; cam.follow = null; syncGoalCamera(); const A = groundAtScreen(l.cx, l.cy, goalCamera);
-  if (l.d > 10 && n.d > 10) g.dist = clamp(g.dist * l.d / n.d, 12, 560);
+  if (l.d > 10 && n.d > 10) g.dist = clamp(g.dist * l.d / n.d, 12, maxCamDist());
   let da = n.ang - l.ang; if (da > Math.PI) da -= TAU; if (da < -Math.PI) da += TAU; g.yaw += da;
   syncGoalCamera(); const B = groundAtScreen(n.cx, n.cy, goalCamera);
   if (A && B){ g.tx += A.x - B.x; g.tz += A.z - B.z; } else panBy(n.cx - l.cx, n.cy - l.cy); }
@@ -2359,7 +2798,7 @@ function endPtr(e){ const p = ptrs.get(e.pointerId); if (!p) return; ptrs.delete
     gesture = null; }
   else if (ptrs.size === 1 && gesture && gesture.kind === 'two'){ gesture = { kind: 'one', moved: true, ghost: false }; const q = [...ptrs.values()][0]; startPan(q.x, q.y); } }
 canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
-canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.goal.dist = clamp(cam.goal.dist * Math.exp(e.deltaY * 0.0012), 12, 560); }, { passive: false });
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.goal.dist = clamp(cam.goal.dist * Math.exp(e.deltaY * 0.0012), 12, maxCamDist()); }, { passive: false });
 const keys = new Set(); window.addEventListener('keydown', (e) => { if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')){ if (e.target.id === 'dinoName'){ if (e.key === 'Enter'){ e.preventDefault(); const b = document.querySelector('[data-act=renameok]'); b && b.click(); } else if (e.key === 'Escape'){ e.preventDefault(); const b = document.querySelector('[data-act=renamecancel]'); b && b.click(); } } return; } keys.add(e.key.toLowerCase()); if (e.key === 'Escape'){ if (tool) cancelTool(); else closeSheet(); } if (e.key === ' ' && G.running){ G.speed = G.speed ? 0 : 1; updateHUD(); e.preventDefault(); } });
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 function keyCamera(dt){ if (!keys.size) return; const s = cam.goal.dist * 0.9 * dt; let mx = 0, mz = 0; if (keys.has('w') || keys.has('arrowup')) mz -= 1; if (keys.has('s') || keys.has('arrowdown')) mz += 1; if (keys.has('a') || keys.has('arrowleft')) mx -= 1; if (keys.has('d') || keys.has('arrowright')) mx += 1;
@@ -2385,13 +2824,10 @@ function applyLighting(){
   if (Math.abs(R - shadowR) > 4){ shadowR = R; const c = sun.shadow.camera; c.left = -R; c.right = R; c.top = R; c.bottom = -R; c.updateProjectionMatrix(); }
 }
 
-/* ================= wild herd (scenery beyond the plot) ================= */
+/* v11: the scenery herd is gone — it looked like animals had escaped into the expansion. */
 const wild = [];
-function spawnWild(){ const spots = [['brachio', -30, -132], ['brachio', 10, -140], ['para', -55, -124], ['para', -48, -130], ['para', -60, -134]];
-  for (const [sp, x, z] of spots){ if (H(x, z) < 0.8) continue; const model = new Dino(sp); scene.add(model.root); wild.push({ sp, x, z, hd: rnd() * TAU, v: 0, tx: x, tz: z, wait: rnd() * 5, model, hx: x, hz: z, state: 'wild' }); } }
-function wildOk(x, z){ const i = toI(x), j = toI(z); if (!inGrid(i, j)) return true; const t = tileType[idx(i, j)]; return t === T_BLOCK || t === T_LOCK; } // the wild herd stays off park land
-function updateWild(dt){ for (const d of wild){ d.wait -= dt; if (d.wait < 0 && Math.hypot(d.tx - d.x, d.tz - d.z) < 2){ for (let k = 0; k < 8; k++){ const tx = d.hx + fr(-30, 30), tz = d.hz + fr(-14, 14); if (H(tx, tz) > 0.8 && H(tx, tz) < 16 && wildOk(tx, tz)){ d.tx = tx; d.tz = tz; break; } } d.wait = 4 + rnd() * 8; if (rnd() < 0.4) d.model.setAction('eat', 4); }
-  d.turn = 0; moveToward(d, d.tx, d.tz, SPECIES[d.sp].walk * 0.7, dt, 0.6); d.model.animate(dt, d.v, d.turn || 0); d.model.root.position.set(d.x, H(d.x, d.z), d.z); d.model.root.rotation.y = d.hd; } }
+function wildOk(x, z){ return false; }
+function updateWild(dt){ }
 
 /* ================= save / load ================= */
 function serialize(){
@@ -2409,7 +2845,9 @@ function serialize0(){
 function saveGame(){ if (!G || G.noSave) return; try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); } catch (e) {} }
 function clearWorld(){
   for (const b of buildings.values()) scene.remove(b.mesh); buildings.clear(); pens.clear(); for (const d of dinos) scene.remove(d.model.root); dinos = []; eggs = []; guests = [];
-  for (const j of jeeps) scene.remove(j.mesh); jeeps.length = 0; tileRef.fill(-1); computeBuildable();
+  for (const j of jeeps) scene.remove(j.mesh); jeeps.length = 0; tileRef.fill(-1);
+  if (LAKES.length){ const oldL = LAKES.splice(0); for (const L of oldL) retopo(L.x0, L.z0, L.x1, L.z1); }
+  computeBuildable();
   monoClearRuntime(); if (PADS.length){ const pp = PADS.splice(0); for (const p of pp) retopo(p.x0 - 4, p.z0 - 4, p.x1 + 4, p.z1 + 4); } if (gateMesh){ scene.remove(gateMesh); gateMesh = null; }
 }
 let gateMesh = null;
@@ -2441,13 +2879,13 @@ function migrateV10(){ if (G.v10) return; G.v10 = true; if (!G.expand) return; l
 function fmtHourIn(at){ const h = Math.max(0, at - absHour()); return h < 1 ? 'within the hour' : `in ${Math.ceil(h)} park hour${Math.ceil(h) > 1 ? 's' : ''}`; }
 function loadGame(){
   const raw = localStorage.getItem(SAVE_KEY); if (!raw) return false; let S; try { S = JSON.parse(raw); } catch (e) { return false; } if (!S || S.v !== 1) return false;
-  clearWorld(); G = Object.assign(freshState(), S.G); G.stats = Object.assign(freshState().stats, S.G.stats || {}); G.ledger = Object.assign(freshState().ledger, S.G.ledger || {}); G.v9 = !!S.G.v9; G.v10 = !!S.G.v10; G.mono = S.G.mono && S.G.mono.lines ? S.G.mono : { lines: [] }; G.spScheme = S.G.spScheme || {}; G.bldPal = S.G.bldPal || 'classic';
+  clearWorld(); G = Object.assign(freshState(), S.G); G.stats = Object.assign(freshState().stats, S.G.stats || {}); G.ledger = Object.assign(freshState().ledger, S.G.ledger || {}); G.v9 = !!S.G.v9; G.v10 = !!S.G.v10; G.v11 = !!S.G.v11; G.regions = Object.assign(emptyRegions(), S.G.regions || {}); G.mono = S.G.mono && S.G.mono.lines ? S.G.mono : { lines: [] }; G.spScheme = S.G.spScheme || {}; G.bldPal = S.G.bldPal || 'classic';
   applyExpansion(); placeGate(); if (S.p2) for (let n = 0; n + 1 < S.p2.length; n += 2) tileType[idx(S.p2[n], S.p2[n + 1])] = T_PATH; else for (const k of S.paths) tileType[idx(k % GRID, (k / GRID) | 0)] = T_PATH;
   for (const p of S.pens) createPen(p.i0, p.j0, p.i1, p.j1, p.tier, { id: p.id, name: p.name, segs: p.segs, broken: p.broken, kind: p.kind || 'land' });
   for (const b of S.buildings){ if (BUILD[b.type].inPen && !pens.has(b.pen)) continue; placeBuilding(b.type, b.i, b.j, { id: b.id, rot: b.rot, pal: b.pal }); }
   for (const d of S.dinos){ const pen = pens.get(d.pen); if (!pen) continue; spawnDino(d.sp, pen, { id: d.id, x: d.x, z: d.z, hunger: d.hunger, thirst: d.thirst ?? 0.2, sc: d.sc, pt: d.pt, name: d.name, fedSkip: d.fedSkip, state: d.state === 'holding' || penBroken(pen) ? 'holding' : 'pen' }); }
   eggs = S.eggs || []; G.hour = Math.max(G.hour, DAY_START); if (!G.econ6){ G.econ6 = true; G.rep = Math.max(G.rep, 55); G.safety = Math.max(G.safety, 70); } migrateV9();
-  G.mono.lines = G.mono.lines.filter(d => d.st.filter(Boolean).every(id => buildings.has(id))); monoRebuildAll(); migrateV10(); afterStructureChange(); return true;
+  G.mono.lines = G.mono.lines.filter(d => d.st.filter(Boolean).every(id => buildings.has(id))); monoRebuildAll(); migrateV10(); migrateV11(); afterStructureChange(); return true;
 }
 
 /* ================= species thumbnails ================= */
@@ -2513,12 +2951,12 @@ const _sv10 = new THREE.Vector3(); function screenOfTile(i, j){ _sv10.set(tX(i),
 window.__DP = {
   get G(){ return G; }, get dinos(){ return dinos; }, get guests(){ return guests.filter(g => !g.gone); }, get pens(){ return [...pens.values()]; }, get buildings(){ return [...buildings.values()]; }, get perf(){ return { blood: bloodIM.count, fps: PERF.fps, cpu: PERF.cpu, q: QUALITY.level, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; },
   vegCounts(){ const o = {}; for (const k in VEG) o[k] = [VEG[k].items.length, VEG[k].ims[0].count]; return o; },
-  cam, SPECIES, OFF, LO, HI, landCounts, buyExpansion, expandFree(){ G.expand = true; applyExpansion(); afterStructureChange(); }, start(fresh = true){ if (fresh) newGame(); G.tutorialDone = true; startPlaying(false); $('tut').classList.add('hidden'); },
+  cam, SPECIES, OFF, LO, HI, landCounts, buyExpansion, expandFree(){ G.expand = true; applyExpansion(); if (typeof applyRegionLand === 'function') applyRegionLand('highland'); afterStructureChange(); }, start(fresh = true){ if (fresh) newGame(); G.tutorialDone = true; startPlaying(false); $('tut').classList.add('hidden'); },
   path(i0, j0, i1, j1){ paintLine([i0, j0], [i1, j1], false); afterStructureChange(); },
   pen(i0, j0, i1, j1, tier, kind = 'land'){ const c = penCanBuild(i0, j0, i1, j1, kind); if (!c.ok) return c.why; spend('build', penCost(i0, j0, i1, j1, tier, kind)); const p = createPen(i0, j0, i1, j1, tier, { kind }); afterStructureChange(); return p.id; },
   build(type, i, j){ const c = canPlace(type, i, j); if (!c.ok) return c.why; spend('build', bldCost(type, i, j)); const b = placeBuilding(type, i, j); afterStructureChange(); return b.id; },
-  hatch(sp, penId, instant){ const pen = pens.get(penId); G.unlockAll = true; const ok = orderEgg(sp, pen); if (ok && instant){ const e = eggs.pop(); hatchEgg(e); } return ok; },
-  spawnGuests(n){ for (let k = 0; k < n; k++){ const g = spawnGuest(); if (!g) break; g.state = 'walk'; const t = [...Array(GN * GN).keys()].filter(k => tileType[k] === T_PATH && exitDist[k] < 1e6); const k2 = t[(rnd() * t.length) | 0]; g.ci = kI(k2); g.cj = kJ(k2); g.x = tX(g.ci); g.z = tZ(g.cj); g.tx = g.x; g.tz = g.z; G.stats.guestsTotal++; G.stats.guestsToday++; earn('tickets', G.price); } },
+  hatch(sp, penId, instant){ const pen = pens.get(penId); if (!pen) return 'no enclosure'; G.unlockAll = true; const ok = orderEgg(sp, pen); if (ok && instant){ const e = eggs.pop(); hatchEgg(e); } return ok; },
+  spawnGuests(n){ for (let k = 0; k < n; k++){ const g = spawnGuest(); if (!g) break; if (g.state === 'walk') continue; g.state = 'walk'; const t = [...Array(GN * GN).keys()].filter(k => tileType[k] === T_PATH && exitDist[k] < 1e6); if (!t.length) continue; const k2 = t[(rnd() * t.length) | 0]; g.ci = kI(k2); g.cj = kJ(k2); g.x = tX(g.ci); g.z = tZ(g.cj); g.tx = g.x; g.tz = g.z; G.stats.guestsTotal++; G.stats.guestsToday++; earn('tickets', G.price); } },
   feed(penId){ return feedGuest(pens.get(penId)); }, breakout(dinoId){ const d = dinos.find(x => x.id === dinoId); breakout(d, pens.get(d.pen)); }, dispatch: dispatchRangers,
   repair(penId){ const pen = pens.get(penId); for (const s of pen.segs){ s.cond = 1; s.broken = false; } releaseHeld(pen); rebuildFences(); showAlert(); },
   focus: focusOn, openSheet, closeSheet, setSpeed(s){ G.speed = s; }, setHour(h){ G.hour = h; }, setQuality, sim(sec){ let t = sec; while (t > 0){ const s = Math.min(t, 0.05); simulate(s); updateWild(s); t -= s; this._vt = (this._vt || 0) + s; if (this._vt >= 1){ this._vt = 0; computeViewMap(); } } }, tick(){ updateCamera(0.05); applyLighting(); renderer.render(scene, camera); },
@@ -2532,15 +2970,16 @@ window.__DP = {
     tileTypes: () => tileType, previewVisible: () => !!(monoPrev && monoPrev.visible), bulldoze(id){ const b = buildings.get(id); if (!b) return false; G.money += BUILD[b.type].cost * 0.5; removeBuilding(b); afterStructureChange(); return true; }, tileAt: (x, y) => tileAtScreen(x, y), toolTapTile(i, j){ const p = screenOfTile(i, j); if (p) toolTap(p); return !!p; } },
   hourly(){ hourTick(); }, ready: false,
   get tool(){ return tool; }, get camera(){ return camera; }, groundAt(x, y){ return groundAtScreen(x, y); }, get undo(){ return undoRec; }, startTool, undoLast, tutorial(k){ showTutorial(k); }, get penMarkers(){ return penMarkers.length; }, guestNeeds, get bubbles(){ return bubbles.filter(b => b.s.visible).length; }, get penSpots(){ return penSpots; }, get ferry(){ return { pendingIn: FERRY.pendingIn, boats: FERRY.boats.map(b => ({ kind: b.slot.kind, state: b.state, t: +b.t.toFixed(1), x: +b.slot.mesh.position.x.toFixed(1), z: +b.slot.mesh.position.z.toFixed(1) })), waiting: waitingAtDock() }; }, onPier, walkH, advisor(){ return moneyAdvisor(); }, guestSpread(){ const gx = tX(GATE.i) + TILE / 2, gz = tZ(GATE.j); const w = guests.filter(g => !g.gone && g.state === 'walk'); const d = w.map(g => Math.hypot(g.x - gx, g.z - gz)); const f = x => d.length ? +(d.filter(v => v > x).length / d.length).toFixed(2) : 0; return { walking: w.length, over30m: f(30), over60m: f(60), over100m: f(100), maxM: Math.round(Math.max(0, ...d)) }; }, penWarn(id){ const p = pens.get(id); return !!p && (!!penWeak(p) || penBroken(p) || penMinCond(p) < 0.45 || penWorn(p)); }, heightAt(x, z){ return H(x, z); }, dailyUpkeep, guestThought, pickGuest, screenOfXZ(x, y, z){ const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight]; }, transferCheck(dId, pId){ return transferCheck(dinos.find(d => d.id === dId), pens.get(pId)); }, startTransfer(dId){ startTransfer(dinos.find(d => d.id === dId)); }, get tutK(){ return tutK; }, flowPerMin(){ return flowPerMin(); }, stars(){ G.stars = computeStars(); checkMissions(); return G.stars; }, get fling(){ return { ...fling }; }, serialize(){ return serialize(); }, load(){ return loadGame(); }, save(){ saveGame(); }, screenOf(i, j){ const v = new THREE.Vector3(tX(i), H(tX(i), tZ(j)), tZ(j)).project(camera); return [(v.x * 0.5 + 0.5) * innerWidth, (-v.y * 0.5 + 0.5) * innerHeight]; }, tileType(i, j){ return tileType[idx(i, j)]; },
+  v11: { REGIONS, regionAt, regionOpen, buyRegion, applyRegion, ensureTestUnlock, tileReg: () => tileReg, tileLand: () => tileLand, openings: () => REGOPEN, lockWhyAt, lagoonRegionOk, lakeRegionOk, unlockedBounds, maxCamDist, migrateV11, wild: () => wild, forest: () => FOREST.items.length, apprDist, V10_LO, V10_HI },
   get v7(){ return { clip: cam.clip, curbs: curbIM.count, curbVis: curbIM.visible, grass: VEG.grass.ims[0].count, flower: VEG.flower.ims[0].count, shrub: VEG.shrub.ims[0].count, log: VEG.log.ims[0].count, guestHi: guestIM.geometry === GGEO[1], fenceHi: FENCE_IM[3].panel.geometry === FENCE_GEO[3][1].panel, bldHi: [...buildings.values()].every(b => b.mesh.userData.body.geometry === bldGeo(b.type, true)), camBoxes: CAM_BOX.length }; },
 };
 
 /* ================= init ================= */
 function init(){
   const m = localStorage.getItem('pp-muted'); if (m === '1') SFX.setMuted(true);
-  computeBuildable(); scatterVegetation(); buildEnv(); buildPier(); prewarm(SP_V8);
+  computeBuildable(); scatterVegetation(); buildForestWall(); buildEnv(); buildPier(); prewarm(SP_V8);
   if (!loadGame()) newGame(false);
-  setQuality(QUALITY.level); buildDock(); makeThumbs(); spawnWild();
+  setQuality(QUALITY.level); buildDock(); makeThumbs();
   { // the v9 species are meshed a few at a time after start-up so loading stays as fast as v8
     const rest = SP_KEYS.filter(k => !SP_V8.includes(k) && !dinos.some(d => d.sp === k)); let n = 0; const step = () => { if (n >= rest.length) return; makeThumbs([rest[n++]]); if (sel && sel.kind === 'species') refreshSheet(); setTimeout(step, 150); }; setTimeout(step, 2500);
     const mine = SP_KEYS.filter(k => !SP_V8.includes(k) && dinos.some(d => d.sp === k)); if (mine.length) makeThumbs(mine); }
